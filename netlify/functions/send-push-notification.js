@@ -37,10 +37,10 @@ exports.handler = async (event, context) => {
                 included_segments: ['Subscribed Users', 'Total Subscriptions'],
                 headings: { fr: title, en: title },
                 contents: { fr: message, en: message },
-                url: url || 'https://cagnotte-plage.netlify.app',
-                chrome_web_icon: 'https://cagnotte-plage.netlify.app/assets/icons/icon-192.png',
-                chrome_web_badge: 'https://cagnotte-plage.netlify.app/assets/icons/icon-192.png',
-                firefox_icon: 'https://cagnotte-plage.netlify.app/assets/icons/icon-192.png'
+                url: url || 'https://cagnotteplage.netlify.app',
+                chrome_web_icon: 'https://cagnotteplage.netlify.app/assets/icons/icon-192.png',
+                chrome_web_badge: 'https://cagnotteplage.netlify.app/assets/icons/icon-192.png',
+                firefox_icon: 'https://cagnotteplage.netlify.app/assets/icons/icon-192.png'
             })
         });
 
