@@ -284,6 +284,14 @@ class NotificationManager {
                 body: msg,
                 icon: './assets/icons/icon-192.png'
             });
+        } else if (data.eventType === 'CONFIG_UPDATED') {
+            if (window.app) {
+                if (typeof window.app.renderInfoView === 'function') window.app.renderInfoView();
+                if (typeof window.app.renderDashboard === 'function') window.app.renderDashboard();
+                if (window.app.countdown && CONFIG.EVENT_DATE) {
+                    window.app.countdown.setTargetDate(CONFIG.EVENT_DATE);
+                }
+            }
         }
     }
 

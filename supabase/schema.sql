@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SCHEMA SUPABASE : CAGNOTTE SORTIE PLAGE 🏖️
+-- SCHEMA SUPABASE : CAGNOTTE SORTIE PLAGE 🏖️ (VERSION COMPLÈTE & TEMPS RÉEL)
 -- ==============================================================================
 
 -- 1. Table des participants préenregistrés
@@ -32,14 +32,32 @@ CREATE TABLE IF NOT EXISTS public.annonces (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Index pour accélérer les requêtes de calcul
+-- 4. Table des réglages généraux synchronisés en temps réel
+CREATE TABLE IF NOT EXISTS public.config_event (
+    id VARCHAR(50) PRIMARY KEY DEFAULT 'main_event',
+    app_name TEXT,
+    app_tagline TEXT,
+    event_location TEXT,
+    event_meeting_info TEXT,
+    event_inclusions TEXT,
+    event_date TEXT,
+    target_per_participant INTEGER,
+    total_custom_goal INTEGER,
+    wave_payment_url TEXT,
+    hero_image TEXT,
+    bottom_banner_image TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Index pour accélérer les requêtes
 CREATE INDEX IF NOT EXISTS idx_paiements_participant_id ON public.paiements(participant_id);
 CREATE INDEX IF NOT EXISTS idx_paiements_statut ON public.paiements(statut);
 
--- 4. Activation de Row Level Security (RLS)
+-- 5. Activation de Row Level Security (RLS)
 ALTER TABLE public.participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.paiements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.annonces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.config_event ENABLE ROW LEVEL SECURITY;
 
 -- Politiques RLS réexécutables (Supprime l'ancienne si elle existe)
 DROP POLICY IF EXISTS "Lecture publique des participants" ON public.participants;
@@ -58,11 +76,19 @@ DROP POLICY IF EXISTS "Insertion publique des annonces" ON public.annonces;
 CREATE POLICY "Insertion publique des annonces" 
 ON public.annonces FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Lecture publique config" ON public.config_event;
+CREATE POLICY "Lecture publique config" 
+ON public.config_event FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Modification publique config" ON public.config_event;
+CREATE POLICY "Modification publique config" 
+ON public.config_event FOR ALL USING (true) WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Insertion réservée au Service Role" ON public.paiements;
 CREATE POLICY "Insertion réservée au Service Role" 
 ON public.paiements FOR INSERT WITH CHECK (auth.role() = 'service_role' OR auth.role() = 'anon');
 
--- 5. Publication Realtime Supabase (Sans erreur si déjà activé)
+-- 6. Publication Realtime Supabase (Sans erreur si déjà activé)
 DO $$
 BEGIN
     BEGIN
@@ -77,9 +103,13 @@ BEGIN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.annonces;
     EXCEPTION WHEN duplicate_object THEN NULL;
     END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.config_event;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
 END $$;
 
--- 5. Données de départ : Les 11 Vrais Participants (0 donnée fictive)
+-- 7. Données de départ : Les 11 Vrais Participants
 INSERT INTO public.participants (id, nom, telephone, objectif) VALUES
 ('11111111-1111-1111-1111-000000000001', 'Albak', '', 25000),
 ('11111111-1111-1111-1111-000000000002', 'AKB', '', 25000),
@@ -93,6 +123,3 @@ INSERT INTO public.participants (id, nom, telephone, objectif) VALUES
 ('11111111-1111-1111-1111-000000000010', 'Tresor', '', 25000),
 ('11111111-1111-1111-1111-000000000011', 'Yves', '', 25000)
 ON CONFLICT (id) DO NOTHING;
-
--- Note : La table paiements démarre à 0 FCFA pour la vraie collecte.
-

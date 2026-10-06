@@ -257,11 +257,96 @@ class DataService {
         return true;
     }
 
-    // Sauvegarder la configuration générale de l'événement
-    saveConfig(customConfig) {
+    // Sauvegarder la configuration générale de l'événement (Sync Locale + Supabase DB + Realtime Broadcast)
+    async saveConfig(customConfig) {
         localStorage.setItem('cagnotte_plage_config_v1', JSON.stringify(customConfig));
         CONFIG.loadSavedConfig();
         this.notifyListeners({ eventType: 'CONFIG_UPDATED', config: customConfig });
+
+        // 1. Enregistrement en base Supabase pour mise à jour permanente chez tous les membres
+        if (this.isRealSupabase && this.supabaseClient) {
+            try {
+                const upsertData = {
+                    id: 'main_event',
+                    app_name: customConfig.APP_NAME,
+                    app_tagline: customConfig.APP_TAGLINE,
+                    event_location: customConfig.EVENT_LOCATION,
+                    event_meeting_info: customConfig.EVENT_MEETING_INFO,
+                    event_inclusions: customConfig.EVENT_INCLUSIONS,
+                    event_date: customConfig.EVENT_DATE,
+                    target_per_participant: Number(customConfig.TARGET_PER_PARTICIPANT),
+                    total_custom_goal: Number(customConfig.TOTAL_CUSTOM_GOAL),
+                    wave_payment_url: customConfig.WAVE_PAYMENT_URL,
+                    hero_image: customConfig.HERO_IMAGE,
+                    bottom_banner_image: customConfig.BOTTOM_BANNER_IMAGE,
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.supabaseClient
+                    .from('config_event')
+                    .upsert([upsertData]);
+                console.log("✅ Configuration synchronisée avec Supabase pour tous les membres !");
+            } catch (err) {
+                console.warn("Erreur sauvegarde config_event Supabase:", err);
+            }
+        }
+
+        // 2. Diffusion instantanée par WebSocket à tous les onglets et téléphones connectés
+        if (this.broadcastChannelSupabase) {
+            try {
+                await this.broadcastChannelSupabase.send({
+                    type: 'broadcast',
+                    event: 'cagnotte_event',
+                    payload: {
+                        eventType: 'CONFIG_UPDATED',
+                        payload: customConfig
+                    }
+                });
+            } catch (e) {}
+        }
+    }
+
+    // Récupérer la configuration enregistrée sur Supabase
+    async fetchRemoteConfig() {
+        if (!this.isRealSupabase || !this.supabaseClient) return;
+        try {
+            const { data, error } = await this.supabaseClient
+                .from('config_event')
+                .select('*')
+                .eq('id', 'main_event')
+                .maybeSingle();
+
+            if (!error && data) {
+                this.applyRemoteConfig(data, false);
+            }
+        } catch (e) {
+            console.warn("Table config_event en attente d'initialisation SQL.");
+        }
+    }
+
+    // Appliquer la configuration distante et rafraîchir l'application
+    applyRemoteConfig(row, triggerNotify = true) {
+        if (!row) return;
+        const mapped = {
+            APP_NAME: row.app_name || CONFIG.APP_NAME,
+            APP_TAGLINE: row.app_tagline || CONFIG.APP_TAGLINE,
+            EVENT_LOCATION: row.event_location || CONFIG.EVENT_LOCATION,
+            EVENT_MEETING_INFO: row.event_meeting_info || CONFIG.EVENT_MEETING_INFO,
+            EVENT_INCLUSIONS: row.event_inclusions || CONFIG.EVENT_INCLUSIONS,
+            EVENT_DATE: row.event_date || CONFIG.EVENT_DATE,
+            TARGET_PER_PARTICIPANT: Number(row.target_per_participant) || CONFIG.TARGET_PER_PARTICIPANT,
+            TOTAL_CUSTOM_GOAL: Number(row.total_custom_goal) || CONFIG.TOTAL_CUSTOM_GOAL,
+            WAVE_PAYMENT_URL: row.wave_payment_url || CONFIG.WAVE_PAYMENT_URL,
+            HERO_IMAGE: row.hero_image || CONFIG.HERO_IMAGE,
+            BOTTOM_BANNER_IMAGE: row.bottom_banner_image || CONFIG.BOTTOM_BANNER_IMAGE
+        };
+
+        Object.assign(CONFIG, mapped);
+        localStorage.setItem('cagnotte_plage_config_v1', JSON.stringify(mapped));
+
+        if (triggerNotify) {
+            this.notifyListeners({ eventType: 'CONFIG_UPDATED', config: mapped });
+        }
     }
 
     // Réinitialiser les données pour la démo
@@ -277,7 +362,10 @@ class DataService {
 
     // Écouteur Supabase Realtime & Canal Broadcast
     setupSupabaseRealtime() {
-        // 1. Écouteur sur les modifications en base (paiements, participants, annonces)
+        // Charger la configuration distante
+        this.fetchRemoteConfig();
+
+        // 1. Écouteur sur les modifications en base (paiements, participants, annonces, config)
         this.supabaseClient
             .channel('public:cagnotte_tables')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'paiements' }, (payload) => {
@@ -305,6 +393,12 @@ class DataService {
                             message: payload.new.message
                         }
                     });
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'config_event' }, (payload) => {
+                console.log('⚙️ Réglages modifiés par l\'admin reçus de Supabase:', payload);
+                if (payload.new) {
+                    this.applyRemoteConfig(payload.new, true);
                 }
             })
             .subscribe();
