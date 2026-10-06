@@ -264,92 +264,202 @@ class PaymentsManager {
         this.openWaveCheckoutModal(participant, amount);
     }
 
-    // Modal de confirmation & paiement Wave
+    // Modal de confirmation & paiement Wave en 2 étapes obligatoires
     openWaveCheckoutModal(participant, amount) {
-        const modal = document.getElementById('wave-checkout-modal');
-        const modalContent = document.getElementById('wave-checkout-content');
-        if (!modal || !modalContent) return;
+        this.checkoutParticipant = participant;
+        this.checkoutAmount = amount;
+        this.checkoutTxRef = `WAVE_TX_${Date.now().toString().slice(-6)}`;
+        this.checkoutStep1Completed = false;
 
-        const txRef = `WAVE_TX_${Date.now().toString().slice(-6)}`;
-        
-        // Construction de l'URL Wave officielle avec pré-remplissage du montant
+        this.renderCheckoutStep(1);
+
+        const modal = document.getElementById('wave-checkout-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    }
+
+    renderCheckoutStep(step) {
+        const modalContent = document.getElementById('wave-checkout-content');
+        if (!modalContent) return;
+
+        const participant = this.checkoutParticipant;
+        const amount = this.checkoutAmount;
+        const txRef = this.checkoutTxRef;
+
         const rawBaseUrl = (CONFIG.WAVE_PAYMENT_URL || "https://pay.wave.com/m/M_ci_NvjJ2LHyaS6A/c/ci/").trim();
         const cleanBase = rawBaseUrl.replace(/\/+$/, '');
         const separator = cleanBase.includes('?') ? '&' : '?';
         const waveUrlWithAmount = `${cleanBase}${separator}amount=${amount}&a=${amount}`;
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waveUrlWithAmount)}`;
 
-        modalContent.innerHTML = `
-            <div class="p-6">
-                <!-- En-tête Wave -->
-                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-2xl bg-[#1dc3eb] flex items-center justify-center shadow-md shadow-[#1dc3eb]/30 overflow-hidden">
-                            <img src="assets/images/wave-logo.png" alt="Wave" class="w-full h-full object-cover">
+        if (step === 1) {
+            modalContent.innerHTML = `
+                <div class="p-6">
+                    <!-- En-tête Wave -->
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-[#1dc3eb] flex items-center justify-center shadow-md shadow-[#1dc3eb]/30 overflow-hidden p-0.5">
+                                <img src="assets/images/wave-logo.png" alt="Wave" class="w-full h-full object-cover">
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-base text-slate-900">Paiement Wave</h3>
+                                <span class="text-[11px] text-slate-400 font-mono">Étape 1 sur 2</span>
+                            </div>
                         </div>
-                        <div>
-                            <h3 class="font-bold text-base text-slate-900 dark:text-white">Paiement Wave</h3>
-                            <span class="text-[11px] text-slate-400 font-mono">Réf: ${txRef}</span>
+                        <button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors" onclick="window.paymentsManager.closeWaveModal()">
+                            ✕
+                        </button>
+                    </div>
+
+                    <!-- Barre d'étapes (Stepper) -->
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <div class="py-2 px-3 rounded-xl bg-sky-50 border-2 border-[#1dc3eb] text-center">
+                            <span class="text-[10px] font-black text-sky-700 uppercase tracking-wider block">Étape 1</span>
+                            <span class="text-xs font-bold text-slate-900">1. Payer avec Wave</span>
+                        </div>
+                        <div class="py-2 px-3 rounded-xl bg-slate-100/70 border border-slate-200 text-center opacity-60">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Étape 2 (Verrouillée 🔒)</span>
+                            <span class="text-xs font-medium text-slate-500">2. Confirmation</span>
                         </div>
                     </div>
-                    <button class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors" onclick="window.paymentsManager.closeWaveModal()">
-                        ✕
-                    </button>
-                </div>
 
-                <!-- Récapitulatif du paiement -->
-                <div class="bg-sky-50 dark:bg-sky-950/40 rounded-2xl p-4 border border-sky-200 dark:border-sky-800/60 mb-4 text-center">
-                    <span class="text-xs text-sky-800 dark:text-sky-300 font-medium block mb-0.5">Montant à verser</span>
-                    <div class="text-3xl font-black text-slate-900 dark:text-white tracking-tight">${formatMoney(amount)}</div>
-                    <span class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block">Participant : <strong>${participant.nom}</strong></span>
-                </div>
+                    <!-- Récapitulatif du montant -->
+                    <div class="bg-sky-50/80 rounded-2xl p-3.5 border border-sky-200 mb-4 text-center">
+                        <span class="text-xs text-sky-800 font-medium block mb-0.5">Montant à verser</span>
+                        <div class="text-3xl font-black text-slate-900 tracking-tight">${formatMoney(amount)}</div>
+                        <span class="text-xs text-slate-500 mt-0.5 block">Participant : <strong>${participant.nom}</strong></span>
+                    </div>
 
-                <!-- QR Code & Étape 1 : Ouvrir Wave -->
-                <div class="space-y-3 mb-5">
-                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 text-center">
-                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
-                            1. Réglez via votre application Wave
-                        </span>
-                        
-                        <!-- Bouton Ouvrir Wave Mobile avec Montant Pré-rempli -->
+                    <!-- ÉTAPE 1 : BOUTON ET QR CODE -->
+                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-[#1dc3eb] text-white text-xs font-black flex items-center justify-center">1</span>
+                            <span class="text-xs font-black text-slate-800">Effectuez le transfert vers Wave</span>
+                        </div>
+
+                        <!-- Bouton Ouvrir Wave Mobile -->
                         <a href="${waveUrlWithAmount}" target="_blank" rel="noopener noreferrer"
-                           class="w-full py-3.5 px-4 rounded-xl bg-[#1dc3eb] hover:bg-[#18b0d5] active:scale-95 text-white font-black text-sm shadow-md shadow-[#1dc3eb]/30 transition-all flex items-center justify-center gap-2 mb-3">
+                           id="wave-external-link-btn"
+                           onclick="window.paymentsManager.markStep1Initiated()"
+                           class="w-full py-3.5 px-4 rounded-xl bg-[#1dc3eb] hover:bg-[#18b0d5] active:scale-95 text-white font-black text-sm shadow-md shadow-[#1dc3eb]/30 transition-all flex items-center justify-center gap-2">
                             <img src="assets/images/wave-logo.png" alt="Wave" class="w-5 h-5 rounded-full object-cover">
                             <span>Ouvrir Wave et Payer (${formatMoney(amount)})</span>
                             <span>↗</span>
                         </a>
 
                         <!-- QR Code pour utilisateur sur PC -->
-                        <div class="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col items-center">
-                            <span class="text-[11px] text-slate-400 mb-2">Ou scannez ce QR Code avec votre téléphone Wave :</span>
+                        <div class="pt-2 border-t border-slate-200 flex flex-col items-center">
+                            <span class="text-[11px] text-slate-400 mb-2">Ou scannez ce QR Code avec l'application Wave :</span>
                             <div class="p-2 bg-white rounded-xl shadow-sm border border-slate-200 inline-block">
-                                <img src="${qrCodeUrl}" alt="QR Code Wave" class="w-32 h-32 object-contain rounded-lg">
+                                <img src="${qrCodeUrl}" alt="QR Code Wave" class="w-28 h-28 object-contain rounded-lg">
                             </div>
                         </div>
                     </div>
 
-                    <!-- Étape 2 : Confirmer la cotisation -->
-                    <div class="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-center">
-                        <span class="text-xs font-bold text-emerald-800 dark:text-emerald-300 block mb-2">
-                            2. Une fois le virement envoyé :
-                        </span>
-                        <button id="wave-confirm-btn" class="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+                    <!-- BOUTON DE PASSAGE OBLIGATOIRE À L'ÉTAPE 2 -->
+                    <div class="space-y-2">
+                        <button id="step1-proceed-btn"
+                                onclick="window.paymentsManager.proceedToStep2()"
+                                class="w-full py-3.5 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black text-sm shadow-lg transition-all flex items-center justify-center gap-2 active:scale-98">
+                            <span>J'ai effectué le paiement Wave</span>
+                            <span>→ Passer à l'étape 2</span>
+                        </button>
+                        <p class="text-[10px] text-slate-400 text-center font-medium">
+                            🔒 Vous devez avoir envoyé l'argent sur Wave avant de passer à l'étape suivante.
+                        </p>
+                    </div>
+                </div>
+            `;
+        } else if (step === 2) {
+            modalContent.innerHTML = `
+                <div class="p-6">
+                    <!-- En-tête Wave -->
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 font-black text-lg">
+                                ✓
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-base text-slate-900">Confirmation</h3>
+                                <span class="text-[11px] text-emerald-600 font-bold">Étape 2 sur 2 — Déclaration</span>
+                            </div>
+                        </div>
+                        <button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors" onclick="window.paymentsManager.closeWaveModal()">
+                            ✕
+                        </button>
+                    </div>
+
+                    <!-- Barre d'étapes (Stepper) -->
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <div class="py-2 px-3 rounded-xl bg-emerald-50 border border-emerald-300 text-center cursor-pointer hover:bg-emerald-100 transition-colors"
+                             onclick="window.paymentsManager.renderCheckoutStep(1)">
+                            <span class="text-[10px] font-black text-emerald-700 uppercase tracking-wider block">Étape 1 (✓ Validée)</span>
+                            <span class="text-xs font-bold text-emerald-800">1. Transfert Wave</span>
+                        </div>
+                        <div class="py-2 px-3 rounded-xl bg-sky-50 border-2 border-[#1dc3eb] text-center">
+                            <span class="text-[10px] font-black text-sky-700 uppercase tracking-wider block">Étape 2</span>
+                            <span class="text-xs font-bold text-slate-900">2. Enregistrer le reçu</span>
+                        </div>
+                    </div>
+
+                    <!-- Récapitulatif Final -->
+                    <div class="bg-emerald-50/80 rounded-2xl p-4 border border-emerald-200 mb-4 space-y-2 text-left">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-500 font-medium">Participant :</span>
+                            <strong class="text-xs text-slate-900 font-black">${participant.nom}</strong>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-500 font-medium">Montant déclaré :</span>
+                            <strong class="text-base text-emerald-700 font-black">${formatMoney(amount)}</strong>
+                        </div>
+                        <div class="flex items-center justify-between pt-1 border-t border-emerald-200/60">
+                            <span class="text-[11px] text-slate-400">Réf. transaction :</span>
+                            <span class="text-[11px] text-slate-700 font-mono font-bold">${txRef}</span>
+                        </div>
+                    </div>
+
+                    <!-- Champ Optionnel ID / Numéro Wave -->
+                    <div class="space-y-1.5 mb-5 text-left">
+                        <label class="text-xs font-bold text-slate-700 block">
+                            Numéro téléphone Wave ou Réf (Optionnel) :
+                        </label>
+                        <input type="text" id="wave-custom-tx-ref" placeholder="Ex: 0708091011 ou Référence Wave"
+                               class="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1dc3eb]">
+                    </div>
+
+                    <!-- Bouton Déclarer Versement -->
+                    <div class="space-y-2.5">
+                        <button id="wave-confirm-btn"
+                                class="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 active:scale-98"
                                 onclick="window.paymentsManager.processWavePayment('${participant.id}', ${amount}, '${txRef}')">
                             <span>✅</span>
-                            <span>Valider mon versement sur le site</span>
+                            <span>Enregistrer mon versement</span>
+                        </button>
+
+                        <button onclick="window.paymentsManager.renderCheckoutStep(1)"
+                                class="w-full py-2.5 text-xs text-slate-500 hover:text-slate-800 font-bold transition-colors">
+                            ← Revenir à l'étape 1
                         </button>
                     </div>
                 </div>
+            `;
+        }
+    }
 
-                <div class="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-                    <span>🔒</span>
-                    <span>Lien direct officiel Wave Côte d'Ivoire</span>
-                </div>
-            </div>
-        `;
+    markStep1Initiated() {
+        this.checkoutStep1Completed = true;
+        const btn = document.getElementById('step1-proceed-btn');
+        if (btn) {
+            btn.classList.remove('bg-slate-900');
+            btn.classList.add('bg-emerald-600', 'animate-bounce');
+            btn.innerHTML = `<span>✓ Wave ouvert ! Passer à l'étape 2 →</span>`;
+        }
+    }
 
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+    proceedToStep2() {
+        this.renderCheckoutStep(2);
     }
 
     closeWaveModal() {
@@ -361,16 +471,20 @@ class PaymentsManager {
     }
 
     // Traiter le paiement (simulateur ou vrai backend)
-    async processWavePayment(participantId, amount, txRef) {
+    async processWavePayment(participantId, amount, defaultTxRef) {
+        const customRefInput = document.getElementById('wave-custom-tx-ref');
+        const customRef = customRefInput?.value?.trim();
+        const txRef = customRef ? `${defaultTxRef} (${customRef})` : defaultTxRef;
+
         const confirmBtn = document.getElementById('wave-confirm-btn');
         if (confirmBtn) {
             confirmBtn.disabled = true;
             confirmBtn.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-slate-950" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Communication avec Wave...
+                Enregistrement du versement...
             `;
         }
 
