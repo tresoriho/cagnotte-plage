@@ -22,11 +22,11 @@ const CONFIG = {
     // Devise d'affichage
     CURRENCY: "FCFA",
 
-    // Configuration Supabase (si disponible en production)
-    SUPABASE_URL: "https://votre-projet.supabase.co",
-    SUPABASE_ANON_KEY: "votre-cle-anon-publique-supabase",
+    // Configuration Supabase (Base de données temps réel en production)
+    SUPABASE_URL: "https://hhunphucbcrzzygupyme.supabase.co",
+    SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhodW5waHVjYmNyenp5Z3VweW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyOTI5MTksImV4cCI6MjEwNjg2ODkxOX0.WmT9MfEIetkMJYqtOwL-NNMgmCANcxYsJ6jJhnwhlkE",
 
-    // Mode démo / simulation actif par défaut si Supabase n'est pas encore connecté
+    // Mode démo / simulation actif si hors-ligne
     USE_LOCAL_STORAGE_FALLBACK: true,
 
     // Lien direct Wave de paiement (Marchand / Cagnotte)
