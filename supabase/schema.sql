@@ -2,7 +2,10 @@
 -- SCHEMA SUPABASE : CAGNOTTE SORTIE PLAGE 🏖️ (VERSION COMPLÈTE & TEMPS RÉEL)
 -- ==============================================================================
 
--- 1. Table des participants préenregistrés
+-- 1. Supprimer l'ancienne contrainte de clé étrangère si elle existe
+ALTER TABLE IF EXISTS public.paiements DROP CONSTRAINT IF EXISTS paiements_participant_id_fkey;
+
+-- 2. Création ou adaptation des tables en type TEXT (Compatible tous IDs)
 CREATE TABLE IF NOT EXISTS public.participants (
     id TEXT PRIMARY KEY,
     nom VARCHAR(100) NOT NULL,
@@ -12,7 +15,6 @@ CREATE TABLE IF NOT EXISTS public.participants (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 2. Table des versements / paiements
 CREATE TABLE IF NOT EXISTS public.paiements (
     id TEXT PRIMARY KEY,
     participant_id TEXT NOT NULL,
@@ -23,6 +25,34 @@ CREATE TABLE IF NOT EXISTS public.paiements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     paid_at TIMESTAMP WITH TIME ZONE
 );
+
+-- Si les tables existaient déjà en UUID, conversion automatique en TEXT
+DO $$
+BEGIN
+    BEGIN
+        ALTER TABLE public.participants ALTER COLUMN id TYPE TEXT USING id::TEXT;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    BEGIN
+        ALTER TABLE public.paiements ALTER COLUMN id TYPE TEXT USING id::TEXT;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    BEGIN
+        ALTER TABLE public.paiements ALTER COLUMN participant_id TYPE TEXT USING participant_id::TEXT;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+END $$;
+
+-- Rétablir la contrainte de clé étrangère
+DO $$
+BEGIN
+    BEGIN
+        ALTER TABLE public.paiements 
+        ADD CONSTRAINT paiements_participant_id_fkey 
+        FOREIGN KEY (participant_id) REFERENCES public.participants(id) ON DELETE CASCADE;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+END $$;
 
 -- 3. Table des annonces / notifications broadcast
 CREATE TABLE IF NOT EXISTS public.annonces (
