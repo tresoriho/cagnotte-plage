@@ -246,7 +246,7 @@ class App {
             const name = participant ? participant.nom : (p.participants?.nom || 'Participant');
             const initials = window.participantsManager ? window.participantsManager.getInitials(name) : 'P';
             const gradient = window.participantsManager ? window.participantsManager.getAvatarGradient(name) : 'from-sky-400 to-blue-600';
-            const isPending = p.statut === 'pending';
+            const isPending = (p.statut || '').toLowerCase() === 'pending' || (p.statut || '').toLowerCase() === 'en_attente';
 
             if (isPending) {
                 return `
@@ -259,22 +259,22 @@ class App {
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-1.5">
                                         <p class="font-bold text-xs text-slate-900 truncate">${name}</p>
-                                        <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-200 text-amber-900 animate-pulse">
+                                        <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-200 text-amber-900 animate-pulse flex-shrink-0">
                                             En attente
                                         </span>
                                     </div>
-                                    <span class="text-[10px] text-slate-500 font-medium">${formatDateTime(p.created_at || p.paid_at)} • <span class="font-mono">${p.wave_transaction_id || 'WAVE'}</span></span>
+                                    <span class="text-[10px] text-slate-500 font-medium block truncate">${formatDateTime(p.created_at || p.paid_at)} • <span class="font-mono">${p.wave_transaction_id || 'WAVE'}</span></span>
                                 </div>
                             </div>
-                            <div class="text-right flex-shrink-0">
+                            <div class="text-right flex-shrink-0 pl-2">
                                 <span class="text-sm font-black text-amber-700">+${formatMoney(p.montant)}</span>
                             </div>
                         </div>
 
                         <!-- Statut informatif sur le Dashboard -->
-                        <div class="flex items-center gap-2 pt-2 border-t border-amber-200/80 text-[11px] font-bold text-amber-800">
-                            <span>⏳</span>
-                            <span>Paiement en attente de validation par l'administrateur</span>
+                        <div class="flex items-center gap-1.5 pt-2 border-t border-amber-200/80 text-[11px] font-bold text-amber-800 leading-tight">
+                            <span class="flex-shrink-0">⏳</span>
+                            <span class="flex-1">Paiement en attente de validation par l'administrateur</span>
                         </div>
                     </div>
                 `;

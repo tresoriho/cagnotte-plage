@@ -728,19 +728,22 @@
                         <span>Envoyer la notification à tous les téléphones</span>
                     </button>
 
-                    <!-- Écoute et test des sonneries -->
-                    <div class="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-                        <span class="text-slate-500 font-medium">🔊 Tester les sonneries de l'application :</span>
-                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <!-- Écoute et test des sonneries de l'application -->
+                    <div class="pt-3 border-t border-slate-200/80 space-y-2.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                            <span>🔊</span>
+                            <span>Tester les sonneries de l'application :</span>
+                        </span>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <button type="button" onclick="window.notificationManager.playBirdChirpSound()" 
-                                    class="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-900 font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
-                                <span>🐦</span>
-                                <span>Sonnerie Oiseaux (Alertes)</span>
+                                    class="w-full py-2.5 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-900 font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+                                <span class="text-base flex-shrink-0">🐦</span>
+                                <span class="truncate">Sonnerie Oiseaux (Alertes)</span>
                             </button>
                             <button type="button" onclick="window.notificationManager.playOceanWaveSound()" 
-                                    class="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-cyan-100 hover:bg-cyan-200 text-cyan-900 font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
-                                <span>🌊</span>
-                                <span>Sonnerie Vagues (Paiements)</span>
+                                    class="w-full py-2.5 px-3 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-900 font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+                                <span class="text-base flex-shrink-0">🌊</span>
+                                <span class="truncate">Sonnerie Vagues (Paiements)</span>
                             </button>
                         </div>
                     </div>
