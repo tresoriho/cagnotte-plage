@@ -4,7 +4,7 @@
 
 -- 1. Table des participants préenregistrés
 CREATE TABLE IF NOT EXISTS public.participants (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     nom VARCHAR(100) NOT NULL,
     telephone VARCHAR(30),
     objectif INTEGER NOT NULL DEFAULT 25000 CHECK (objectif > 0),
@@ -14,12 +14,12 @@ CREATE TABLE IF NOT EXISTS public.participants (
 
 -- 2. Table des versements / paiements
 CREATE TABLE IF NOT EXISTS public.paiements (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    participant_id UUID NOT NULL REFERENCES public.participants(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    participant_id TEXT NOT NULL,
     montant INTEGER NOT NULL CHECK (montant > 0),
-    wave_transaction_id VARCHAR(120) UNIQUE,
+    wave_transaction_id VARCHAR(120),
     wave_checkout_id VARCHAR(120),
-    statut VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (statut IN ('pending', 'completed', 'failed', 'cancelled')),
+    statut VARCHAR(30) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     paid_at TIMESTAMP WITH TIME ZONE
 );
@@ -100,15 +100,15 @@ END $$;
 
 -- 7. Données de départ : Les 11 Vrais Participants
 INSERT INTO public.participants (id, nom, telephone, objectif) VALUES
-('11111111-1111-1111-1111-000000000001', 'Albak', '', 25000),
-('11111111-1111-1111-1111-000000000002', 'AKB', '', 25000),
-('11111111-1111-1111-1111-000000000003', 'Amporio', '', 25000),
-('11111111-1111-1111-1111-000000000004', 'Arthur', '', 25000),
-('11111111-1111-1111-1111-000000000005', 'Basil', '', 25000),
-('11111111-1111-1111-1111-000000000006', 'David', '', 25000),
-('11111111-1111-1111-1111-000000000007', 'Papos', '', 25000),
-('11111111-1111-1111-1111-000000000008', 'Stephane', '', 25000),
-('11111111-1111-1111-1111-000000000009', 'Tony', '', 25000),
-('11111111-1111-1111-1111-000000000010', 'Tresor', '', 25000),
-('11111111-1111-1111-1111-000000000011', 'Yves', '', 25000)
-ON CONFLICT (id) DO NOTHING;
+('1', 'Albak', '', 25000),
+('2', 'AKB', '', 25000),
+('3', 'Amporio', '', 25000),
+('4', 'Arthur', '', 25000),
+('5', 'Basil', '', 25000),
+('6', 'David', '', 25000),
+('7', 'Papos', '', 25000),
+('8', 'Stephane', '', 25000),
+('9', 'Tony', '', 25000),
+('10', 'Tresor', '', 25000),
+('11', 'Yves', '', 25000)
+ON CONFLICT (id) DO UPDATE SET nom = EXCLUDED.nom, objectif = EXCLUDED.objectif;

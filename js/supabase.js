@@ -75,13 +75,17 @@ class DataService {
         if (this.isRealSupabase && this.supabaseClient) {
             const { data, error } = await this.supabaseClient
                 .from('paiements')
-                .select('*, participants(nom)')
+                .select('*')
                 .order('created_at', { ascending: false });
             if (error) {
                 console.error("Erreur chargement paiements Supabase:", error);
                 return this.getLocalPayments();
             }
-            return data;
+            if (data && Array.isArray(data)) {
+                localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(data));
+                return data;
+            }
+            return this.getLocalPayments();
         }
         return this.getLocalPayments();
     }
@@ -101,7 +105,7 @@ class DataService {
     async addPayment(paymentPayload) {
         const newPayment = {
             id: 'pay-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-            participant_id: paymentPayload.participant_id,
+            participant_id: String(paymentPayload.participant_id),
             montant: Number(paymentPayload.montant),
             wave_transaction_id: paymentPayload.wave_transaction_id || `WAVE_TX_${Math.floor(1000 + Math.random() * 9000)}`,
             statut: paymentPayload.statut || 'pending', // 'pending' (en attente admin) ou 'completed'
@@ -109,30 +113,35 @@ class DataService {
             paid_at: paymentPayload.statut === 'completed' ? new Date().toISOString() : null
         };
 
+        // 1. Sauvegarde locale immédiate
+        this.savePaymentLocally(newPayment);
+
+        let finalPayment = newPayment;
+
+        // 2. Insertion dans Supabase
         if (this.isRealSupabase && this.supabaseClient) {
-            const { data, error } = await this.supabaseClient
-                .from('paiements')
-                .insert([newPayment])
-                .select();
-            if (error) {
-                console.error("Erreur insertion paiement Supabase:", error);
-                // Fallback local
-                this.savePaymentLocally(newPayment);
-            } else {
-                this.notifyListeners({ eventType: 'INSERT', new: data[0] });
-                return data[0];
+            try {
+                const { data, error } = await this.supabaseClient
+                    .from('paiements')
+                    .insert([newPayment])
+                    .select();
+                if (error) {
+                    console.error("Erreur insertion paiement Supabase:", error);
+                } else if (data && data[0]) {
+                    finalPayment = data[0];
+                }
+            } catch (err) {
+                console.warn("Exception insert Supabase:", err);
             }
-        } else {
-            this.savePaymentLocally(newPayment);
         }
 
-        // Déclencher l'événement Realtime
+        // 3. Déclencher l'événement Realtime
         this.notifyListeners({
             eventType: 'INSERT',
-            new: newPayment
+            new: finalPayment
         });
 
-        return newPayment;
+        return finalPayment;
     }
 
     // Valider un paiement en attente par l'administrateur
@@ -150,10 +159,14 @@ class DataService {
         localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
 
         if (this.isRealSupabase && this.supabaseClient) {
-            await this.supabaseClient
-                .from('paiements')
-                .update({ statut: 'completed', paid_at: new Date().toISOString() })
-                .eq('id', id);
+            try {
+                await this.supabaseClient
+                    .from('paiements')
+                    .update({ statut: 'completed', paid_at: new Date().toISOString() })
+                    .eq('id', id);
+            } catch (e) {
+                console.warn("Erreur update Supabase:", e);
+            }
         }
 
         this.notifyListeners({
@@ -178,10 +191,14 @@ class DataService {
         localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
 
         if (this.isRealSupabase && this.supabaseClient) {
-            await this.supabaseClient
-                .from('paiements')
-                .update({ statut: 'cancelled' })
-                .eq('id', id);
+            try {
+                await this.supabaseClient
+                    .from('paiements')
+                    .update({ statut: 'cancelled' })
+                    .eq('id', id);
+            } catch (e) {
+                console.warn("Erreur cancel Supabase:", e);
+            }
         }
 
         this.notifyListeners({

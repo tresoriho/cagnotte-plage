@@ -494,6 +494,11 @@ class PaymentsManager {
 
         await window.dataService.addPayment(paymentPayload);
 
+        // Recharger immédiatement les données locales et distantes
+        if (window.app && typeof window.app.reloadData === 'function') {
+            await window.app.reloadData();
+        }
+
         // Fermer la modal Wave Checkout
         this.closeWaveModal();
 
