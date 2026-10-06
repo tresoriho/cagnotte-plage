@@ -92,6 +92,19 @@ class AdminManager {
             });
         }
 
+        // Écouteur sur la cotisation par participant pour recalculer immédiatement le budget et l'objectif total
+        const targetPerPersonInput = document.getElementById('admin-target-per-person');
+        if (targetPerPersonInput) {
+            targetPerPersonInput.addEventListener('input', () => {
+                this.updateCalculatedSummary();
+                const totalGoalInput = document.getElementById('admin-total-goal');
+                const val = Number(targetPerPersonInput.value) || CONFIG.TARGET_PER_PARTICIPANT;
+                if (totalGoalInput) {
+                    totalGoalInput.value = val * this.participants.length;
+                }
+            });
+        }
+
         // Formulaire d'ajout individuel d'un participant
         const addParticipantForm = document.getElementById('admin-add-participant-form');
         if (addParticipantForm) {
@@ -412,9 +425,10 @@ class AdminManager {
         if (bottomHiddenInput) bottomHiddenInput.value = CONFIG.BOTTOM_BANNER_IMAGE || 'assets/images/friends-beach.jpg';
         
         const count = this.participants.length;
-        const calcTotal = this.participants.reduce((sum, p) => sum + Number(p.objectif || CONFIG.TARGET_PER_PARTICIPANT), 0);
-        if (totalGoalInput && !totalGoalInput.value) {
-            totalGoalInput.value = CONFIG.TOTAL_CUSTOM_GOAL || calcTotal || (CONFIG.TARGET_PER_PARTICIPANT * count);
+        const targetPerPerson = Number(targetPerPersonInput?.value) || CONFIG.TARGET_PER_PARTICIPANT;
+        const calcTotal = this.participants.reduce((sum, p) => sum + Number(p.objectif || targetPerPerson), 0);
+        if (totalGoalInput) {
+            totalGoalInput.value = calcTotal || (targetPerPerson * count);
         }
 
         // Séparer les paiements en attente et les paiements validés

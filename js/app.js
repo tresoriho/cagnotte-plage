@@ -107,8 +107,8 @@ class App {
     // Calculer les métriques globales de la cagnotte
     calculateGlobalStats() {
         const totalParticipants = this.participants.length;
-        const computedSum = this.participants.reduce((sum, p) => sum + Number(p.objectif || CONFIG.TARGET_PER_PARTICIPANT), 0);
-        const totalTarget = (CONFIG.TOTAL_CUSTOM_GOAL && CONFIG.TOTAL_CUSTOM_GOAL > 0) ? Number(CONFIG.TOTAL_CUSTOM_GOAL) : (computedSum || (CONFIG.TARGET_PER_PARTICIPANT * totalParticipants));
+        // L'objectif total augmente immédiatement dès qu'un nouveau membre est ajouté
+        const totalTarget = this.participants.reduce((sum, p) => sum + Number(p.objectif || CONFIG.TARGET_PER_PARTICIPANT), 0);
         
         const totalCollected = this.payments
             .filter(p => p.statut === 'completed')
