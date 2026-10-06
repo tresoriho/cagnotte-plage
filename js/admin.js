@@ -396,6 +396,19 @@ class AdminManager {
 
     // Afficher et mettre à jour la vue d'administration
     renderAdminView() {
+        // Toujours récupérer les données synchronisées les plus récentes
+        if (window.app && Array.isArray(window.app.payments) && window.app.payments.length > 0) {
+            this.payments = window.app.payments;
+        } else if (window.dataService) {
+            this.payments = window.dataService.getLocalPayments();
+        }
+
+        if (window.app && Array.isArray(window.app.participants) && window.app.participants.length > 0) {
+            this.participants = window.app.participants;
+        } else if (window.dataService) {
+            this.participants = window.dataService.getLocalParticipants();
+        }
+
         // Pré-remplir les champs de réglages
         const nameInput = document.getElementById('admin-app-name');
         const taglineInput = document.getElementById('admin-app-tagline');
@@ -431,9 +444,15 @@ class AdminManager {
             totalGoalInput.value = calcTotal || (targetPerPerson * count);
         }
 
-        // Séparer les paiements en attente et les paiements validés
-        const pendingPayments = this.payments.filter(p => p.statut === 'pending');
-        const completedPayments = this.payments.filter(p => p.statut === 'completed');
+        // Séparer les paiements en attente et les paiements validés (insensible à la casse)
+        const pendingPayments = this.payments.filter(p => {
+            const st = (p.statut || p.status || '').toLowerCase().trim();
+            return st === 'pending' || st === 'en_attente' || st === 'attente';
+        });
+        const completedPayments = this.payments.filter(p => {
+            const st = (p.statut || p.status || '').toLowerCase().trim();
+            return st === 'completed' || st === 'valide' || st === 'validé' || st === 'success';
+        });
 
         // Mettre à jour les badges
         const countBadge = document.getElementById('admin-participants-badge');

@@ -577,7 +577,7 @@ class App {
         } else if (viewName === 'info') {
             this.renderInfoView();
         } else if (viewName === 'admin' && window.adminManager) {
-            window.adminManager.renderAdminView();
+            window.adminManager.updateData(this.participants, this.payments);
         }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
