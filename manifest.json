@@ -1,0 +1,50 @@
+{
+  "name": "Sortie Plage 🏖️ — Cagnotte",
+  "short_name": "Cagnotte Plage",
+  "description": "Suivi en direct des cotisations et paiement Wave pour notre sortie à la plage entre amis.",
+  "start_url": "./index.html",
+  "id": "cagnotte-plage-app",
+  "display": "standalone",
+  "background_color": "#F4FAFD",
+  "theme_color": "#1dc3eb",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["finance", "social", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Payer avec Wave",
+      "short_name": "Payer",
+      "description": "Effectuer une cotisation avec Wave",
+      "url": "./index.html#payer",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Liste des participants",
+      "short_name": "Participants",
+      "description": "Voir la liste des amis et leurs cotisations",
+      "url": "./index.html#participants",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
