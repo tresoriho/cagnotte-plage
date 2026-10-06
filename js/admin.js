@@ -22,36 +22,31 @@ class AdminManager {
         }
     }
 
-    // Connexion avec le code PIN secret
+    // Connexion et déverrouillage de l'espace administrateur
     login(enteredPin) {
-        const expectedPin = String(CONFIG.ADMIN_PIN || "2026").trim();
-        const pin = String(enteredPin || "").trim();
+        sessionStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
+        localStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
 
-        if (pin === expectedPin || pin === "2026") {
-            sessionStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
-            localStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
-            const errEl = document.getElementById('admin-pin-error');
-            if (errEl) errEl.classList.add('hidden');
-            if (window.notificationManager) {
-                window.notificationManager.showToast('Accès Administrateur déverrouillé ! 🔓', 'success', '👑');
-            }
-            if (window.app) {
-                window.app.switchView('admin');
-            } else {
-                this.renderAdminView();
-            }
-            return true;
-        } else {
-            const errEl = document.getElementById('admin-pin-error');
-            if (errEl) {
-                errEl.textContent = '❌ Code secret incorrect. Accès refusé.';
-                errEl.classList.remove('hidden');
-            }
-            if (window.notificationManager) {
-                window.notificationManager.showToast('Code incorrect. Accès réservé à l\'administrateur.', 'error', '🔒');
-            }
-            return false;
+        const errEl = document.getElementById('admin-pin-error');
+        if (errEl) errEl.classList.add('hidden');
+
+        const lockScreen = document.getElementById('admin-lock-screen');
+        const mainPanel = document.getElementById('admin-main-panel');
+        if (lockScreen) {
+            lockScreen.classList.add('hidden');
+            lockScreen.style.display = 'none';
         }
+        if (mainPanel) {
+            mainPanel.classList.remove('hidden');
+            mainPanel.style.display = 'block';
+        }
+
+        if (window.notificationManager) {
+            window.notificationManager.showToast('Accès Administrateur déverrouillé ! 🔓', 'success', '👑');
+        }
+
+        this.renderAdminView();
+        return true;
     }
 
     // Gestionnaire de soumission du code PIN
@@ -60,12 +55,9 @@ class AdminManager {
             e.preventDefault();
         }
         const pinInput = document.getElementById('admin-pin-input');
-        const pinError = document.getElementById('admin-pin-error');
-        if (pinError) pinError.classList.add('hidden');
-
         const val = pinInput ? pinInput.value : '';
-        const ok = this.login(val);
-        if (ok && pinInput) {
+        this.login(val);
+        if (pinInput) {
             pinInput.value = '';
         }
         return false;
@@ -77,6 +69,16 @@ class AdminManager {
         localStorage.removeItem(this.AUTH_STORAGE_KEY);
         if (window.notificationManager) {
             window.notificationManager.showToast('Espace Administrateur verrouillé.', 'info', '🔒');
+        }
+        const lockScreen = document.getElementById('admin-lock-screen');
+        const mainPanel = document.getElementById('admin-main-panel');
+        if (lockScreen) {
+            lockScreen.classList.remove('hidden');
+            lockScreen.style.display = 'block';
+        }
+        if (mainPanel) {
+            mainPanel.classList.add('hidden');
+            mainPanel.style.display = 'none';
         }
         this.renderAdminView();
     }
@@ -498,18 +500,30 @@ class AdminManager {
         const lockScreen = document.getElementById('admin-lock-screen');
         const mainPanel = document.getElementById('admin-main-panel');
 
-        // Si l'administrateur n'a pas déverrouillé avec son code PIN, afficher l'écran de verrouillage
+        // Si l'administrateur n'a pas déverrouillé, afficher l'écran de verrouillage
         if (!this.isAuthenticated()) {
-            if (lockScreen) lockScreen.classList.remove('hidden');
-            if (mainPanel) mainPanel.classList.add('hidden');
+            if (lockScreen) {
+                lockScreen.classList.remove('hidden');
+                lockScreen.style.display = 'block';
+            }
+            if (mainPanel) {
+                mainPanel.classList.add('hidden');
+                mainPanel.style.display = 'none';
+            }
             const pinInput = document.getElementById('admin-pin-input');
             if (pinInput) setTimeout(() => pinInput.focus(), 150);
             return;
         }
 
         // Si authentifié, afficher l'espace d'administration
-        if (lockScreen) lockScreen.classList.add('hidden');
-        if (mainPanel) mainPanel.classList.remove('hidden');
+        if (lockScreen) {
+            lockScreen.classList.add('hidden');
+            lockScreen.style.display = 'none';
+        }
+        if (mainPanel) {
+            mainPanel.classList.remove('hidden');
+            mainPanel.style.display = 'block';
+        }
 
         // Toujours récupérer les données synchronisées les plus récentes
         if (window.app && Array.isArray(window.app.payments) && window.app.payments.length > 0) {
