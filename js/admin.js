@@ -13,84 +13,84 @@ class AdminManager {
         }
     }
 
-    // Vérifie si l'administrateur est authentifié
+    // Vérifie si l'administrateur est authentifié (accès direct sans code PIN)
     isAuthenticated() {
-        try {
-            return sessionStorage.getItem(this.AUTH_STORAGE_KEY) === 'true' || localStorage.getItem(this.AUTH_STORAGE_KEY) === 'true';
-        } catch (e) {
-            return false;
-        }
-    }
-
-    // Connexion et déverrouillage de l'espace administrateur
-    login(enteredPin) {
-        sessionStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
-        localStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
-
-        const errEl = document.getElementById('admin-pin-error');
-        if (errEl) errEl.classList.add('hidden');
-
-        const lockScreen = document.getElementById('admin-lock-screen');
-        const mainPanel = document.getElementById('admin-main-panel');
-        if (lockScreen) {
-            lockScreen.classList.add('hidden');
-            lockScreen.style.display = 'none';
-        }
-        if (mainPanel) {
-            mainPanel.classList.remove('hidden');
-            mainPanel.style.display = 'block';
-        }
-
-        if (window.notificationManager) {
-            window.notificationManager.showToast('Accès Administrateur déverrouillé ! 🔓', 'success', '👑');
-        }
-
-        this.renderAdminView();
         return true;
     }
 
-    // Gestionnaire de soumission du code PIN
-    handlePinSubmit(e) {
-        if (e && typeof e.preventDefault === 'function') {
-            e.preventDefault();
-        }
-        const pinInput = document.getElementById('admin-pin-input');
-        const val = pinInput ? pinInput.value : '';
-        this.login(val);
-        if (pinInput) {
-            pinInput.value = '';
-        }
-        return false;
+    // Déverrouillage direct
+    login() {
+        return true;
     }
 
-    // Déconnexion et verrouillage de l'espace administrateur
+    // Soumission PIN désactivée (accès direct)
+    handlePinSubmit() {
+        return true;
+    }
+
+    // Déconnexion désactivée (retour dashboard)
     logout() {
-        sessionStorage.removeItem(this.AUTH_STORAGE_KEY);
-        localStorage.removeItem(this.AUTH_STORAGE_KEY);
-        if (window.notificationManager) {
-            window.notificationManager.showToast('Espace Administrateur verrouillé.', 'info', '🔒');
+        if (window.app) {
+            window.app.switchView('dashboard');
         }
-        const lockScreen = document.getElementById('admin-lock-screen');
-        const mainPanel = document.getElementById('admin-main-panel');
-        if (lockScreen) {
-            lockScreen.classList.remove('hidden');
-            lockScreen.style.display = 'block';
-        }
-        if (mainPanel) {
-            mainPanel.classList.add('hidden');
-            mainPanel.style.display = 'none';
-        }
-        this.renderAdminView();
     }
 
     init() {
         this.bindEvents();
+        if (window.dataService) {
+            this.participants = window.dataService.getLocalParticipants();
+            this.payments = window.dataService.getLocalPayments();
+        }
+        this.renderAdminView();
     }
 
     updateData(participants, payments) {
-        this.participants = participants;
-        this.payments = payments;
+        this.participants = participants || [];
+        this.payments = payments || [];
         this.renderAdminView();
+    }
+
+    // Créer rapidement un versement en attente (test ou déclaration manuelle)
+    async createTestPendingPayment(participantId = null, amount = 5000) {
+        if (!this.participants || this.participants.length === 0) {
+            if (window.dataService) {
+                this.participants = window.dataService.getLocalParticipants();
+            }
+        }
+
+        if (!this.participants || this.participants.length === 0) {
+            alert("Veuillez d'abord ajouter au moins un participant.");
+            return;
+        }
+
+        let targetP = null;
+        if (participantId) {
+            targetP = this.participants.find(p => String(p.id) === String(participantId));
+        }
+        if (!targetP) {
+            targetP = this.participants[0];
+        }
+
+        const txRef = `WAVE_DECLARATION_${Date.now().toString().slice(-5)}`;
+        const testPayload = {
+            participant_id: targetP.id,
+            montant: Number(amount) || 5000,
+            wave_transaction_id: txRef,
+            statut: 'pending'
+        };
+
+        await window.dataService.addPayment(testPayload);
+
+        if (window.app && typeof window.app.reloadData === 'function') {
+            await window.app.reloadData();
+        } else {
+            this.payments = window.dataService.getLocalPayments();
+            this.renderAdminView();
+        }
+
+        if (window.notificationManager) {
+            window.notificationManager.showToast(`Versement de ${formatMoney(testPayload.montant)} en attente pour ${targetP.nom} !`, 'info', '⏳');
+        }
     }
 
     bindEvents() {
@@ -440,11 +440,6 @@ class AdminManager {
 
     // Supprimer un participant
     async deleteParticipant(id, nom) {
-        if (!this.isAuthenticated()) {
-            alert("Accès refusé : Seul l'administrateur avec code secret peut effectuer cette action.");
-            this.renderAdminView();
-            return;
-        }
         if (confirm(`Supprimer définitivement ${nom} de la liste ?`)) {
             await window.dataService.deleteParticipant(id);
             window.notificationManager.showToast(`${nom} supprimé(e).`, 'info', '🗑️');
@@ -453,27 +448,22 @@ class AdminManager {
 
     // Supprimer un versement individuel
     async deletePayment(id, nom, montant) {
-        if (!this.isAuthenticated()) {
-            alert("Accès refusé : Seul l'administrateur avec code secret peut effectuer cette action.");
-            this.renderAdminView();
-            return;
-        }
         if (confirm(`Supprimer ce versement de ${formatMoney(montant)} pour ${nom} ?`)) {
             await window.dataService.deletePayment(id);
             window.notificationManager.showToast(`Versement de ${formatMoney(montant)} supprimé.`, 'info', '🗑️');
         }
     }
 
-    // Valider un versement en attente (RÉSERVÉ EXCLUSIVEMENT À L'ADMINISTRATEUR)
+    // Valider un versement en attente
     async validatePayment(id, nom, montant) {
-        if (!this.isAuthenticated()) {
-            alert("Accès refusé : Seul l'administrateur avec code secret a la possibilité de valider un paiement.");
-            this.renderAdminView();
-            return;
-        }
-
         if (confirm(`Confirmer la réception de ${formatMoney(montant)} pour ${nom} et l'ajouter à la cagnotte ?`)) {
             await window.dataService.validatePayment(id);
+            if (window.app && typeof window.app.reloadData === 'function') {
+                await window.app.reloadData();
+            } else {
+                this.payments = window.dataService.getLocalPayments();
+                this.renderAdminView();
+            }
             window.notificationManager.showToast(`Paiement de ${nom} validé avec succès (+${formatMoney(montant)}) !`, 'success', '🎉', 'wave');
             if (window.paymentsManager) {
                 window.paymentsManager.launchConfetti();
@@ -481,61 +471,40 @@ class AdminManager {
         }
     }
 
-    // Rejeter ou annuler un versement non reçu en attente (RÉSERVÉ EXCLUSIVEMENT À L'ADMINISTRATEUR)
+    // Rejeter ou annuler un versement non reçu en attente
     async rejectPayment(id, nom, montant) {
-        if (!this.isAuthenticated()) {
-            alert("Accès refusé : Seul l'administrateur avec code secret a la possibilité d'annuler ou refuser un paiement.");
-            this.renderAdminView();
-            return;
-        }
-
         if (confirm(`Annuler cette déclaration de versement de ${formatMoney(montant)} pour ${nom} (paiement non reçu sur Wave) ?`)) {
             await window.dataService.cancelPayment(id);
+            if (window.app && typeof window.app.reloadData === 'function') {
+                await window.app.reloadData();
+            } else {
+                this.payments = window.dataService.getLocalPayments();
+                this.renderAdminView();
+            }
             window.notificationManager.showToast(`Déclaration de ${nom} annulée (non reçue).`, 'info', '❌');
         }
     }
 
     // Afficher et mettre à jour la vue d'administration
     renderAdminView() {
-        const lockScreen = document.getElementById('admin-lock-screen');
         const mainPanel = document.getElementById('admin-main-panel');
-
-        // Si l'administrateur n'a pas déverrouillé, afficher l'écran de verrouillage
-        if (!this.isAuthenticated()) {
-            if (lockScreen) {
-                lockScreen.classList.remove('hidden');
-                lockScreen.style.display = 'block';
-            }
-            if (mainPanel) {
-                mainPanel.classList.add('hidden');
-                mainPanel.style.display = 'none';
-            }
-            const pinInput = document.getElementById('admin-pin-input');
-            if (pinInput) setTimeout(() => pinInput.focus(), 150);
-            return;
-        }
-
-        // Si authentifié, afficher l'espace d'administration
-        if (lockScreen) {
-            lockScreen.classList.add('hidden');
-            lockScreen.style.display = 'none';
-        }
         if (mainPanel) {
             mainPanel.classList.remove('hidden');
             mainPanel.style.display = 'block';
         }
 
         // Toujours récupérer les données synchronisées les plus récentes
-        if (window.app && Array.isArray(window.app.payments) && window.app.payments.length > 0) {
-            this.payments = window.app.payments;
-        } else if (window.dataService) {
-            this.payments = window.dataService.getLocalPayments();
-        }
+        if (window.dataService) {
+            const localPay = window.dataService.getLocalPayments();
+            const appPay = (window.app && Array.isArray(window.app.payments)) ? window.app.payments : [];
+            this.payments = (appPay.length >= localPay.length) ? appPay : localPay;
 
-        if (window.app && Array.isArray(window.app.participants) && window.app.participants.length > 0) {
-            this.participants = window.app.participants;
-        } else if (window.dataService) {
-            this.participants = window.dataService.getLocalParticipants();
+            const localPart = window.dataService.getLocalParticipants();
+            const appPart = (window.app && Array.isArray(window.app.participants)) ? window.app.participants : [];
+            this.participants = (appPart.length >= localPart.length) ? appPart : localPart;
+        } else if (window.app) {
+            if (Array.isArray(window.app.payments)) this.payments = window.app.payments;
+            if (Array.isArray(window.app.participants)) this.participants = window.app.participants;
         }
 
         // Pré-remplir les champs de réglages

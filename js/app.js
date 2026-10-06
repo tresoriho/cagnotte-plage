@@ -38,8 +38,14 @@ class App {
         // Chargement initial des données
         await this.reloadData();
 
-        // Initialiser la vue initiale
-        this.switchView('dashboard');
+        // Initialiser la vue initiale (support de l'URL avec #admin, #info, etc.)
+        const initialHash = (window.location.hash || '').replace('#', '').trim();
+        const validViews = ['dashboard', 'participants', 'history', 'info', 'admin'];
+        if (validViews.includes(initialHash)) {
+            this.switchView(initialHash);
+        } else {
+            this.switchView('dashboard');
+        }
 
         // Écouteurs pour les filtres et recherche
         this.setupParticipantFilters();
@@ -534,8 +540,17 @@ class App {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const targetView = btn.getAttribute('data-view-target');
+                window.location.hash = targetView;
                 this.switchView(targetView);
             });
+        });
+
+        window.addEventListener('hashchange', () => {
+            const hash = (window.location.hash || '').replace('#', '').trim();
+            const validViews = ['dashboard', 'participants', 'history', 'info', 'admin'];
+            if (validViews.includes(hash) && this.currentView !== hash) {
+                this.switchView(hash);
+            }
         });
     }
 
@@ -578,6 +593,7 @@ class App {
             this.renderInfoView();
         } else if (viewName === 'admin' && window.adminManager) {
             window.adminManager.updateData(this.participants, this.payments);
+            window.adminManager.renderAdminView();
         }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
