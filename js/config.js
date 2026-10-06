@@ -6,13 +6,12 @@ const CONFIG = {
     APP_NAME: "Cagnotte Sortie Plage 🏖️",
     APP_TAGLINE: "Tous ensemble pour une journée inoubliable 🌊",
 
-    // Date cible de la sortie (format ISO ou Date parseable)
-    // Modifiable à volonté par les organisateurs
-    EVENT_DATE: "2026-11-15T08:30:00",
+    // Date cible de la sortie (Samedi 7 Novembre 2026)
+    EVENT_DATE: "2026-11-07T08:30:00",
 
     // Lieu et détails de la sortie
     EVENT_LOCATION: "Plage Privée d'Assinie - KM 12 (Espace paillotes & transats)",
-    EVENT_MEETING_INFO: "Dimanche 15 Novembre 2026 à 08h30 (Cocody Angré 7e Tranche)",
+    EVENT_MEETING_INFO: "Samedi 7 Novembre 2026 à 08h30 (Cocody Angré 7e Tranche)",
     EVENT_INCLUSIONS: "Transport VIP aller-retour\nBarbecue & grillades au feu de bois 🥩\nBoissons fraîches à volonté 🍹\nAccès plage privée, transats & musique 🎵",
     EVENT_THEME: "Journée Détente, Barbecue & Baignade 🍹",
 
