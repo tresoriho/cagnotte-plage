@@ -168,18 +168,31 @@ class NotificationManager {
         }
 
         try {
+            // Activer également OneSignal Push
+            if (window.OneSignalDeferred) {
+                window.OneSignalDeferred.push(async function(OneSignal) {
+                    try {
+                        if (OneSignal.Notifications && OneSignal.Notifications.requestPermission) {
+                            await OneSignal.Notifications.requestPermission();
+                        }
+                    } catch (e) {
+                        console.warn("OneSignal permission call:", e);
+                    }
+                });
+            }
+
             const permission = await Notification.requestPermission();
             this.updateNotificationUiState();
 
             if (permission === 'granted') {
-                this.showToast("Super ! Notifications activées à chaque nouveau versement.", "success", "🔔");
+                this.showToast("Super ! Notifications push activées sur votre appareil.", "success", "🔔");
                 this.sendNativeNotification("🏖️ Notifications Activées !", {
-                    body: "Vous serez averti en direct à chaque cotisation effectuée par les participants.",
+                    body: "Vous serez averti en direct à chaque cotisation ou annonce.",
                     icon: './assets/icons/icon-192.png'
                 });
                 return true;
             } else {
-                this.showToast("Notifications désactivées ou refusées.", "warning", "🔕");
+                this.showToast("Notifications désactivées ou en attente.", "warning", "🔕");
                 return false;
             }
         } catch (err) {

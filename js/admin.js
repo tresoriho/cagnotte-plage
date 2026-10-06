@@ -197,6 +197,21 @@ class AdminManager {
             await window.dataService.sendBroadcastAnnouncement(title, message);
         }
 
+        // 4. Envoi OneSignal Push en arrière-plan (pour réveiller et allumer l'écran des téléphones verrouillés / fermés)
+        try {
+            await fetch('/.netlify/functions/send-push-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    message: message,
+                    url: window.location.origin
+                })
+            });
+        } catch (err) {
+            console.warn("Notification OneSignal en arrière-plan non envoyée :", err);
+        }
+
         // Notification de confirmation à l'admin
         setTimeout(() => {
             if (window.notificationManager) {

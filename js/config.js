@@ -25,6 +25,9 @@ const CONFIG = {
     SUPABASE_URL: "https://hhunphucbcrzzygupyme.supabase.co",
     SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhodW5waHVjYmNyenp5Z3VweW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyOTI5MTksImV4cCI6MjEwNjg2ODkxOX0.WmT9MfEIetkMJYqtOwL-NNMgmCANcxYsJ6jJhnwhlkE",
 
+    // OneSignal App ID pour les notifications push en arrière-plan (écrans verrouillés)
+    ONESIGNAL_APP_ID: "d3a5b43d-b59f-40ad-8f71-d0d5e13ad63a",
+
     // Mode démo / simulation actif si hors-ligne
     USE_LOCAL_STORAGE_FALLBACK: true,
 
