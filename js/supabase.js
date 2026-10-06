@@ -45,18 +45,36 @@ class DataService {
         }
     }
 
-    // Récupérer tous les participants
+    // Dédupliquer strictement les participants (évite les doublons)
+    deduplicateParticipants(list) {
+        if (!list || !Array.isArray(list)) return CONFIG.INITIAL_PARTICIPANTS;
+        const seen = new Set();
+        const unique = [];
+
+        for (const p of list) {
+            if (!p || !p.nom) continue;
+            const norm = p.nom.trim().toLowerCase();
+            if (!seen.has(norm)) {
+                seen.add(norm);
+                unique.push(p);
+            }
+        }
+        return unique.length > 0 ? unique : CONFIG.INITIAL_PARTICIPANTS;
+    }
+
+    // Récupérer tous les participants (100% uniques, sans doublon)
     async getParticipants() {
         if (this.isRealSupabase && this.supabaseClient) {
             const { data, error } = await this.supabaseClient
                 .from('participants')
                 .select('*')
-                .order('id', { ascending: true });
-            if (error) {
-                console.error("Erreur chargement participants Supabase:", error);
+                .order('created_at', { ascending: true });
+            if (error || !data || data.length === 0) {
                 return this.getLocalParticipants();
             }
-            return data;
+            const cleanList = this.deduplicateParticipants(data);
+            localStorage.setItem(this.STORAGE_KEY_PARTICIPANTS, JSON.stringify(cleanList));
+            return cleanList;
         }
         return this.getLocalParticipants();
     }
@@ -64,9 +82,10 @@ class DataService {
     getLocalParticipants() {
         try {
             const raw = localStorage.getItem(this.STORAGE_KEY_PARTICIPANTS);
-            return raw ? JSON.parse(raw) : CONFIG.INITIAL_PARTICIPANTS;
+            const list = raw ? JSON.parse(raw) : CONFIG.INITIAL_PARTICIPANTS;
+            return this.deduplicateParticipants(list);
         } catch (e) {
-            return CONFIG.INITIAL_PARTICIPANTS;
+            return this.deduplicateParticipants(CONFIG.INITIAL_PARTICIPANTS);
         }
     }
 
@@ -215,19 +234,21 @@ class DataService {
         localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(currentPayments));
     }
 
-    // Enregistrer / Remplacer tous les participants
+    // Enregistrer / Remplacer tous les participants (100% uniques)
     async saveParticipants(list) {
+        const cleanList = this.deduplicateParticipants(list);
         if (this.isRealSupabase && this.supabaseClient) {
             try {
-                // Pour Supabase, mise à jour ou insertion
-                console.log("Synchronisation participants avec Supabase...");
+                await this.supabaseClient
+                    .from('participants')
+                    .upsert(cleanList);
             } catch (e) {
-                console.warn(e);
+                console.warn("Erreur upsert participants Supabase:", e);
             }
         }
-        localStorage.setItem(this.STORAGE_KEY_PARTICIPANTS, JSON.stringify(list));
-        this.notifyListeners({ eventType: 'UPDATE_PARTICIPANTS', participants: list });
-        return list;
+        localStorage.setItem(this.STORAGE_KEY_PARTICIPANTS, JSON.stringify(cleanList));
+        this.notifyListeners({ eventType: 'UPDATE_PARTICIPANTS', participants: cleanList });
+        return cleanList;
     }
 
     // Ajouter un participant
