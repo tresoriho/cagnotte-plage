@@ -386,11 +386,11 @@ class AdminManager {
         }
     }
 
-    // Rejeter ou annuler un versement en attente
+    // Rejeter ou annuler un versement non reçu en attente
     async rejectPayment(id, nom, montant) {
-        if (confirm(`Refuser / annuler la déclaration de versement de ${formatMoney(montant)} pour ${nom} ?`)) {
+        if (confirm(`Annuler cette déclaration de versement de ${formatMoney(montant)} pour ${nom} (paiement non reçu sur Wave) ?`)) {
             await window.dataService.cancelPayment(id);
-            window.notificationManager.showToast(`Déclaration de versement pour ${nom} annulée.`, 'info', '❌');
+            window.notificationManager.showToast(`Déclaration de ${nom} annulée (non reçue).`, 'info', '❌');
         }
     }
 
@@ -490,17 +490,17 @@ class AdminManager {
                                 </div>
                             </div>
 
-                            <!-- Actions de validation -->
+                            <!-- Actions de validation administrateur -->
                             <div class="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200/60 dark:border-amber-800/40">
                                 <button onclick="window.adminManager.validatePayment('${pay.id}', '${name.replace(/'/g, "\\'")}', ${pay.montant})" 
                                         class="flex-1 sm:flex-none py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95">
                                     <span>✅</span>
-                                    <span>Valider</span>
+                                    <span>Valider le versement</span>
                                 </button>
                                 <button onclick="window.adminManager.rejectPayment('${pay.id}', '${name.replace(/'/g, "\\'")}', ${pay.montant})" 
-                                        class="py-2 px-3 rounded-xl bg-rose-100 dark:bg-rose-900/40 hover:bg-rose-200 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors flex items-center justify-center gap-1">
+                                        class="py-2 px-3.5 rounded-xl bg-rose-100 dark:bg-rose-900/40 hover:bg-rose-200 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors flex items-center justify-center gap-1 active:scale-95">
                                     <span>❌</span>
-                                    <span>Rejeter</span>
+                                    <span>Annuler (non reçu)</span>
                                 </button>
                             </div>
                         </div>
