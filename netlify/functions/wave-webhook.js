@@ -4,7 +4,6 @@
  */
 
 const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
 
 exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') {
@@ -50,12 +49,17 @@ exports.handler = async (event, context) => {
                 return { statusCode: 500, body: 'Configuration serveur Supabase incomplète' };
             }
 
-            const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-            // 3. Enregistrement sécurisé du paiement avec protection contre les doublons (idempotence)
-            const { data, error } = await supabase
-                .from('paiements')
-                .insert([{
+            // 3. Enregistrement sécurisé du paiement via l'API REST Supabase (PostgREST)
+            //    avec protection contre les doublons (idempotence)
+            const response = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/paiements`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_SERVICE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify([{
                     participant_id: participantId,
                     montant: amount,
                     wave_transaction_id: transactionId,
@@ -63,7 +67,11 @@ exports.handler = async (event, context) => {
                     statut: 'completed',
                     paid_at: new Date().toISOString()
                 }])
-                .select();
+            });
+
+            const result = await response.json().catch(() => null);
+            const data = response.ok ? result : null;
+            const error = response.ok ? null : (result || { message: `HTTP ${response.status}` });
 
             if (error) {
                 // Si la transaction existe déjà, on retourne 200 pour acquitter Wave
