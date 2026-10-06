@@ -271,18 +271,10 @@ class App {
                             </div>
                         </div>
 
-                        <!-- Actions directes pour l'organisateur / admin sur le Dashboard -->
-                        <div class="flex items-center gap-2 pt-2 border-t border-amber-200/80">
-                            <button onclick="window.adminManager.validatePayment('${p.id}', '${name.replace(/'/g, "\\'")}', ${p.montant})"
-                                    class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 active:scale-95">
-                                <span>✅</span>
-                                <span>Valider le versement</span>
-                            </button>
-                            <button onclick="window.adminManager.rejectPayment('${p.id}', '${name.replace(/'/g, "\\'")}', ${p.montant})"
-                                    class="py-2 px-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs transition-colors flex items-center justify-center gap-1">
-                                <span>❌</span>
-                                <span>Annuler</span>
-                            </button>
+                        <!-- Statut informatif sur le Dashboard -->
+                        <div class="flex items-center gap-2 pt-2 border-t border-amber-200/80 text-[11px] font-bold text-amber-800">
+                            <span>⏳</span>
+                            <span>Paiement en attente de validation par l'administrateur</span>
                         </div>
                     </div>
                 `;
