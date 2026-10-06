@@ -387,14 +387,17 @@
                 </div>
             </div>
 
-            <!-- DERNIERS VERSEMENTS CONFIRMÉS -->
-            <div class="card-premium p-5 space-y-3">
+            <!-- ACTIVITÉ ET DERNIERS VERSEMENTS (EN TEMPS RÉEL) -->
+            <div class="card-premium p-5 space-y-3 border border-slate-200 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="text-base">⚡</span>
-                        <h3 class="font-heading font-black text-sm text-slate-900">Derniers versements confirmés</h3>
+                        <h3 class="font-heading font-black text-sm text-slate-900">Activité & Versements récents</h3>
+                        <span id="dashboard-pending-count-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                            0 en attente
+                        </span>
                     </div>
-                    <button class="text-xs font-bold text-sky-600 hover:text-sky-800" data-view-target="history">
+                    <button class="text-xs font-bold text-sky-600 hover:text-sky-800 transition-colors" data-view-target="history">
                         Tout voir →
                     </button>
                 </div>

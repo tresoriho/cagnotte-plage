@@ -164,6 +164,34 @@ class DataService {
         return targetPayment;
     }
 
+    // Annuler ou rejeter un paiement
+    async cancelPayment(id) {
+        let payments = this.getLocalPayments();
+        let targetPayment = null;
+        payments = payments.map(p => {
+            if (String(p.id) === String(id)) {
+                p.statut = 'cancelled';
+                targetPayment = p;
+            }
+            return p;
+        });
+        localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
+
+        if (this.isRealSupabase && this.supabaseClient) {
+            await this.supabaseClient
+                .from('paiements')
+                .update({ statut: 'cancelled' })
+                .eq('id', id);
+        }
+
+        this.notifyListeners({
+            eventType: 'CANCEL_PAYMENT',
+            payment: targetPayment
+        });
+
+        return targetPayment;
+    }
+
     savePaymentLocally(payment) {
         const currentPayments = this.getLocalPayments();
         currentPayments.unshift(payment);
@@ -474,8 +502,10 @@ class DataService {
             if (payload.eventType === 'INSERT' && payload.new) {
                 const participants = this.getLocalParticipants();
                 const p = participants.find(part => String(part.id) === String(payload.new.participant_id)) || { nom: 'Un ami' };
+                const isPending = payload.new.statut === 'pending';
+                const eventType = isPending ? 'PENDING_PAYMENT' : 'NEW_PAYMENT';
                 const eventData = {
-                    eventType: 'NEW_PAYMENT',
+                    eventType: eventType,
                     payload: {
                         participantName: p.nom,
                         montant: payload.new.montant,
@@ -483,7 +513,45 @@ class DataService {
                         targetAmount: CONFIG.TARGET_PER_PARTICIPANT
                     }
                 };
-                window.notificationManager.broadcastEvent('NEW_PAYMENT', eventData.payload);
+                window.notificationManager.broadcastEvent(eventType, eventData.payload);
+                if (this.broadcastChannelSupabase) {
+                    this.broadcastChannelSupabase.send({
+                        type: 'broadcast',
+                        event: 'cagnotte_event',
+                        payload: eventData
+                    });
+                }
+            } else if (payload.eventType === 'VALIDATE_PAYMENT' && payload.payment) {
+                const participants = this.getLocalParticipants();
+                const p = participants.find(part => String(part.id) === String(payload.payment.participant_id)) || { nom: 'Un ami' };
+                const eventData = {
+                    eventType: 'VALIDATE_PAYMENT',
+                    payload: {
+                        participantName: p.nom,
+                        montant: payload.payment.montant,
+                        paymentId: payload.payment.id
+                    }
+                };
+                window.notificationManager.broadcastEvent('VALIDATE_PAYMENT', eventData.payload);
+                if (this.broadcastChannelSupabase) {
+                    this.broadcastChannelSupabase.send({
+                        type: 'broadcast',
+                        event: 'cagnotte_event',
+                        payload: eventData
+                    });
+                }
+            } else if (payload.eventType === 'CANCEL_PAYMENT' && payload.payment) {
+                const participants = this.getLocalParticipants();
+                const p = participants.find(part => String(part.id) === String(payload.payment.participant_id)) || { nom: 'Un ami' };
+                const eventData = {
+                    eventType: 'CANCEL_PAYMENT',
+                    payload: {
+                        participantName: p.nom,
+                        montant: payload.payment.montant,
+                        paymentId: payload.payment.id
+                    }
+                };
+                window.notificationManager.broadcastEvent('CANCEL_PAYMENT', eventData.payload);
                 if (this.broadcastChannelSupabase) {
                     this.broadcastChannelSupabase.send({
                         type: 'broadcast',

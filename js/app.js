@@ -209,44 +209,99 @@ class App {
 
     renderRecentDashboardActivity() {
         const container = document.getElementById('dashboard-recent-payments');
+        const pendingBadge = document.getElementById('dashboard-pending-count-badge');
         if (!container) return;
 
+        const pending = this.payments.filter(p => p.statut === 'pending');
         const completed = this.payments.filter(p => p.statut === 'completed');
-        const recent = completed.slice(0, 4);
 
-        if (recent.length === 0) {
+        // Mettre à jour le badge de versements en attente
+        if (pendingBadge) {
+            if (pending.length > 0) {
+                pendingBadge.textContent = `${pending.length} en attente ⏳`;
+                pendingBadge.classList.remove('hidden');
+            } else {
+                pendingBadge.classList.add('hidden');
+            }
+        }
+
+        // Afficher d'abord tous les paiements en attente, puis les plus récents confirmés (max 5 au total)
+        const displayList = [...pending, ...completed].slice(0, 6);
+
+        if (displayList.length === 0) {
             container.innerHTML = `
                 <div class="text-center py-6 px-4 space-y-2">
                     <div class="w-12 h-12 mx-auto rounded-full bg-sky-50 text-sky-500 flex items-center justify-center text-xl">
                         🪙
                     </div>
-                    <p class="text-xs font-bold text-slate-700">Aucun versement confirmé pour le moment.</p>
-                    <p class="text-[11px] text-slate-400">Les nouveaux paiements apparaîtront ici après validation.</p>
+                    <p class="text-xs font-bold text-slate-700">Aucun versement pour le moment.</p>
+                    <p class="text-[11px] text-slate-400">Les déclarations Wave apparaîtront ici immédiatement en temps réel.</p>
                 </div>
             `;
             return;
         }
 
-        container.innerHTML = recent.map(p => {
+        container.innerHTML = displayList.map(p => {
             const participant = this.participants.find(part => String(part.id) === String(p.participant_id));
             const name = participant ? participant.nom : (p.participants?.nom || 'Participant');
             const initials = window.participantsManager ? window.participantsManager.getInitials(name) : 'P';
             const gradient = window.participantsManager ? window.participantsManager.getAvatarGradient(name) : 'from-sky-400 to-blue-600';
+            const isPending = p.statut === 'pending';
+
+            if (isPending) {
+                return `
+                    <div class="p-3.5 rounded-2xl bg-amber-50/90 border-2 border-amber-300 shadow-sm space-y-2.5 transition-all">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <div class="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center flex-shrink-0 shadow-sm">
+                                    ⏳
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <p class="font-bold text-xs text-slate-900 truncate">${name}</p>
+                                        <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-200 text-amber-900 animate-pulse">
+                                            En attente
+                                        </span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">${formatDateTime(p.created_at || p.paid_at)} • <span class="font-mono">${p.wave_transaction_id || 'WAVE'}</span></span>
+                                </div>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <span class="text-sm font-black text-amber-700">+${formatMoney(p.montant)}</span>
+                            </div>
+                        </div>
+
+                        <!-- Actions directes pour l'organisateur / admin sur le Dashboard -->
+                        <div class="flex items-center gap-2 pt-2 border-t border-amber-200/80">
+                            <button onclick="window.adminManager.validatePayment('${p.id}', '${name.replace(/'/g, "\\'")}', ${p.montant})"
+                                    class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 active:scale-95">
+                                <span>✅</span>
+                                <span>Valider le versement</span>
+                            </button>
+                            <button onclick="window.adminManager.rejectPayment('${p.id}', '${name.replace(/'/g, "\\'")}', ${p.montant})"
+                                    class="py-2 px-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs transition-colors flex items-center justify-center gap-1">
+                                <span>❌</span>
+                                <span>Annuler</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
 
             return `
                 <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 shadow-sm">
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
                         <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${gradient} text-white font-black text-xs flex items-center justify-center flex-shrink-0">
                             ${initials}
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <p class="font-bold text-xs text-slate-900 truncate">${name}</p>
                             <span class="text-[10px] text-slate-400 font-medium">${formatDateTime(p.paid_at || p.created_at)}</span>
                         </div>
                     </div>
-                    <div class="text-right">
+                    <div class="text-right flex-shrink-0">
                         <span class="text-xs font-black text-emerald-600">+${formatMoney(p.montant)}</span>
-                        <span class="block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded mt-0.5">Confirmé ✅</span>
+                        <span class="block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded mt-0.5">Confirmé ✅</span>
                     </div>
                 </div>
             `;

@@ -275,13 +275,26 @@ class NotificationManager {
                 body: `${p.participantName} a cotisé ${formatMoney(p.montant)} avec Wave.`,
                 icon: './assets/images/wave-logo.png'
             });
+        } else if (data.eventType === 'PENDING_PAYMENT') {
+            const p = data.payload;
+            this.showToast(`⏳ <strong>${p.participantName}</strong> a envoyé un versement Wave de <strong>${formatMoney(p.montant)}</strong> (En attente de validation admin).`, "warning", "⏳", "bird");
+            this.sendNativeNotification(`⏳ Nouveau versement Wave déclaré`, {
+                body: `${p.participantName} a versé ${formatMoney(p.montant)}. En cours de validation par l'admin.`,
+                icon: './assets/images/wave-logo.png'
+            });
         } else if (data.eventType === 'VALIDATE_PAYMENT') {
             const p = data.payload;
-            this.showInfo(`✅ Versement de ${formatMoney(p.montant)} validé pour ${p.participantName} !`, "info", "wave");
+            this.showInfo(`✅ Versement de ${formatMoney(p.montant)} validé pour ${p.participantName} !`, "success", "wave");
             this.sendNativeNotification(`✅ Versement validé !`, {
                 body: `Le versement de ${formatMoney(p.montant)} pour ${p.participantName} a été approuvé.`,
                 icon: './assets/images/wave-logo.png'
             });
+            if (window.paymentsManager) {
+                window.paymentsManager.launchConfetti();
+            }
+        } else if (data.eventType === 'CANCEL_PAYMENT') {
+            const p = data.payload;
+            this.showInfo(`❌ Déclaration de versement annulée pour ${p.participantName}.`, "error");
         } else if (data.eventType === 'NEW_PARTICIPANT') {
             const p = data.payload;
             this.showInfo(`👥 ${p.nom} a rejoint la liste des participants !`, "info");

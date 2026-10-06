@@ -59,34 +59,23 @@ ALTER TABLE public.paiements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.annonces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.config_event ENABLE ROW LEVEL SECURITY;
 
--- Politiques RLS réexécutables (Supprime l'ancienne si elle existe)
 DROP POLICY IF EXISTS "Lecture publique des participants" ON public.participants;
 CREATE POLICY "Lecture publique des participants" 
-ON public.participants FOR SELECT USING (true);
+ON public.participants FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Lecture publique des paiements confirmés" ON public.paiements;
-CREATE POLICY "Lecture publique des paiements confirmés" 
-ON public.paiements FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Insertion réservée au Service Role" ON public.paiements;
+DROP POLICY IF EXISTS "Gestion publique des paiements" ON public.paiements;
+CREATE POLICY "Gestion publique des paiements" 
+ON public.paiements FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Lecture publique des annonces" ON public.annonces;
 CREATE POLICY "Lecture publique des annonces" 
-ON public.annonces FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Insertion publique des annonces" ON public.annonces;
-CREATE POLICY "Insertion publique des annonces" 
-ON public.annonces FOR INSERT WITH CHECK (true);
+ON public.annonces FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Lecture publique config" ON public.config_event;
 CREATE POLICY "Lecture publique config" 
-ON public.config_event FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Modification publique config" ON public.config_event;
-CREATE POLICY "Modification publique config" 
 ON public.config_event FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Insertion réservée au Service Role" ON public.paiements;
-CREATE POLICY "Insertion réservée au Service Role" 
-ON public.paiements FOR INSERT WITH CHECK (auth.role() = 'service_role' OR auth.role() = 'anon');
 
 -- 6. Publication Realtime Supabase (Sans erreur si déjà activé)
 DO $$

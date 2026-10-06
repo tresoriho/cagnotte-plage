@@ -373,11 +373,11 @@ class AdminManager {
         }
     }
 
-    // Rejeter un versement en attente
+    // Rejeter ou annuler un versement en attente
     async rejectPayment(id, nom, montant) {
-        if (confirm(`Refuser / rejeter la déclaration de versement de ${formatMoney(montant)} pour ${nom} ?`)) {
-            await window.dataService.deletePayment(id);
-            window.notificationManager.showToast(`Déclaration de versement rejetée.`, 'info', '❌');
+        if (confirm(`Refuser / annuler la déclaration de versement de ${formatMoney(montant)} pour ${nom} ?`)) {
+            await window.dataService.cancelPayment(id);
+            window.notificationManager.showToast(`Déclaration de versement pour ${nom} annulée.`, 'info', '❌');
         }
     }
 
