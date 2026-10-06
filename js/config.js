@@ -10,9 +10,9 @@ const CONFIG = {
     EVENT_DATE: "2026-11-07T08:30:00",
 
     // Lieu et détails de la sortie
-    EVENT_LOCATION: "Plage Privée d'Assinie - KM 12 (Espace paillotes & transats)",
-    EVENT_MEETING_INFO: "Samedi 7 Novembre 2026 à 08h30 (Cocody Angré 7e Tranche)",
-    EVENT_INCLUSIONS: "Transport VIP aller-retour\nBarbecue & grillades au feu de bois 🥩\nBoissons fraîches à volonté 🍹\nAccès plage privée, transats & musique 🎵",
+    EVENT_LOCATION: "Plage Privée de Jacqueville",
+    EVENT_MEETING_INFO: "Samedi 7 Novembre 2026 à 08h30 (Carrefour Terre rouge)",
+    EVENT_INCLUSIONS: "🚌 Transport aller-retour\n🛏️ Chambre pour couple (M. et Mme)\n🍽️ Nourriture\n🥤 Boissons\n🏖️ Accès à la plage et à la piscine\n🎉 Activités et autres divertissements sur place\n❤️ Et le reste, c’est pour profiter de la vie ! 🥳🌴",
     EVENT_THEME: "Journée Détente, Barbecue & Baignade 🍹",
 
     // Objectif individuel par participant (en FCFA)
