@@ -41,28 +41,43 @@ ALTER TABLE public.participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.paiements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.annonces ENABLE ROW LEVEL SECURITY;
 
--- Politiques RLS : Lecture publique autorisée (Aucun compte requis)
+-- Politiques RLS réexécutables (Supprime l'ancienne si elle existe)
+DROP POLICY IF EXISTS "Lecture publique des participants" ON public.participants;
 CREATE POLICY "Lecture publique des participants" 
 ON public.participants FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Lecture publique des paiements confirmés" ON public.paiements;
 CREATE POLICY "Lecture publique des paiements confirmés" 
 ON public.paiements FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Lecture publique des annonces" ON public.annonces;
 CREATE POLICY "Lecture publique des annonces" 
 ON public.annonces FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Insertion publique des annonces" ON public.annonces;
 CREATE POLICY "Insertion publique des annonces" 
 ON public.annonces FOR INSERT WITH CHECK (true);
 
--- Politiques RLS : Seul le backend sécurisé (Service Role) peut insérer ou modifier les paiements
+DROP POLICY IF EXISTS "Insertion réservée au Service Role" ON public.paiements;
 CREATE POLICY "Insertion réservée au Service Role" 
 ON public.paiements FOR INSERT WITH CHECK (auth.role() = 'service_role' OR auth.role() = 'anon');
 
--- 5. Publication Realtime Supabase
--- Permet à Supabase Realtime d'émettre des événements sur les nouvelles insertions
-ALTER PUBLICATION supabase_realtime ADD TABLE public.paiements;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.participants;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.annonces;
+-- 5. Publication Realtime Supabase (Sans erreur si déjà activé)
+DO $$
+BEGIN
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.paiements;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.participants;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.annonces;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+END $$;
 
 -- 5. Données de départ : Les 11 Vrais Participants (0 donnée fictive)
 INSERT INTO public.participants (id, nom, telephone, objectif) VALUES
