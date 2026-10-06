@@ -298,7 +298,11 @@ class DataService {
             .subscribe();
 
         // 2. Canal Broadcast pour notifications instantanées entre tous les téléphones/clients
-        this.broadcastChannelSupabase = this.supabaseClient.channel('cagnotte_broadcast_room');
+        this.broadcastChannelSupabase = this.supabaseClient.channel('cagnotte_broadcast_room', {
+            config: {
+                broadcast: { ack: true }
+            }
+        });
         this.broadcastChannelSupabase
             .on('broadcast', { event: 'cagnotte_event' }, ({ payload }) => {
                 console.log('📢 Notification Broadcast reçue de Supabase:', payload);
@@ -306,7 +310,30 @@ class DataService {
                     window.notificationManager.handleBroadcastMessage(payload);
                 }
             })
-            .subscribe();
+            .subscribe((status, err) => {
+                console.log('📡 Statut connexion temps réel Supabase:', status, err || '');
+            });
+    }
+
+    // Diffuser une annonce à tous les téléphones connectés
+    async sendBroadcastAnnouncement(title, message) {
+        const eventData = {
+            eventType: 'ANNOUNCEMENT',
+            payload: { title, message }
+        };
+
+        if (this.broadcastChannelSupabase) {
+            try {
+                await this.broadcastChannelSupabase.send({
+                    type: 'broadcast',
+                    event: 'cagnotte_event',
+                    payload: eventData
+                });
+                console.log("✅ Message broadcast envoyé avec succès via Supabase");
+            } catch (err) {
+                console.warn("Erreur envoi broadcast Supabase:", err);
+            }
+        }
     }
 
     // Système d'abonnement pour l'UI

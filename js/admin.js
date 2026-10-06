@@ -193,19 +193,8 @@ class AdminManager {
         }
 
         // 3. Diffuser en direct via Supabase Realtime à tous les téléphones connectés
-        if (window.dataService && window.dataService.broadcastChannelSupabase) {
-            try {
-                await window.dataService.broadcastChannelSupabase.send({
-                    type: 'broadcast',
-                    event: 'cagnotte_event',
-                    payload: {
-                        eventType: 'ANNOUNCEMENT',
-                        payload: payload
-                    }
-                });
-            } catch (err) {
-                console.warn("Erreur diffusion broadcast Supabase:", err);
-            }
+        if (window.dataService) {
+            await window.dataService.sendBroadcastAnnouncement(title, message);
         }
 
         // Notification de confirmation à l'admin
