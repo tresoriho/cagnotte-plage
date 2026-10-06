@@ -230,12 +230,15 @@ class NotificationManager {
         const finalOptions = Object.assign(defaultOptions, options);
 
         try {
-            // Utiliser le Service Worker si disponible (nécessaire sur mobile / Android / iOS 16.4+)
-            if (this.swRegistration && 'showNotification' in this.swRegistration) {
-                await this.swRegistration.showNotification(title, finalOptions);
-            } else {
-                new Notification(title, finalOptions);
+            // Utiliser le Service Worker actif (indispensable sur iPhone PWA et Android)
+            if ('serviceWorker' in navigator) {
+                const reg = await navigator.serviceWorker.ready;
+                if (reg && 'showNotification' in reg) {
+                    await reg.showNotification(title, finalOptions);
+                    return;
+                }
             }
+            new Notification(title, finalOptions);
         } catch (e) {
             console.warn("Impossible d'afficher la notification système :", e);
         }

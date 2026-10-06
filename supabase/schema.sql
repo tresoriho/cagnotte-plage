@@ -24,13 +24,22 @@ CREATE TABLE IF NOT EXISTS public.paiements (
     paid_at TIMESTAMP WITH TIME ZONE
 );
 
+-- 3. Table des annonces / notifications broadcast
+CREATE TABLE IF NOT EXISTS public.annonces (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    titre VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Index pour accélérer les requêtes de calcul
 CREATE INDEX IF NOT EXISTS idx_paiements_participant_id ON public.paiements(participant_id);
 CREATE INDEX IF NOT EXISTS idx_paiements_statut ON public.paiements(statut);
 
--- 3. Activation de Row Level Security (RLS)
+-- 4. Activation de Row Level Security (RLS)
 ALTER TABLE public.participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.paiements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.annonces ENABLE ROW LEVEL SECURITY;
 
 -- Politiques RLS : Lecture publique autorisée (Aucun compte requis)
 CREATE POLICY "Lecture publique des participants" 
@@ -39,14 +48,21 @@ ON public.participants FOR SELECT USING (true);
 CREATE POLICY "Lecture publique des paiements confirmés" 
 ON public.paiements FOR SELECT USING (true);
 
+CREATE POLICY "Lecture publique des annonces" 
+ON public.annonces FOR SELECT USING (true);
+
+CREATE POLICY "Insertion publique des annonces" 
+ON public.annonces FOR INSERT WITH CHECK (true);
+
 -- Politiques RLS : Seul le backend sécurisé (Service Role) peut insérer ou modifier les paiements
 CREATE POLICY "Insertion réservée au Service Role" 
 ON public.paiements FOR INSERT WITH CHECK (auth.role() = 'service_role' OR auth.role() = 'anon');
 
--- 4. Publication Realtime Supabase
+-- 5. Publication Realtime Supabase
 -- Permet à Supabase Realtime d'émettre des événements sur les nouvelles insertions
 ALTER PUBLICATION supabase_realtime ADD TABLE public.paiements;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.participants;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.annonces;
 
 -- 5. Données de départ : Les 11 Vrais Participants (0 donnée fictive)
 INSERT INTO public.participants (id, nom, telephone, objectif) VALUES

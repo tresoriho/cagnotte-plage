@@ -277,9 +277,9 @@ class DataService {
 
     // Écouteur Supabase Realtime & Canal Broadcast
     setupSupabaseRealtime() {
-        // 1. Écouteur sur les modifications en base
+        // 1. Écouteur sur les modifications en base (paiements, participants, annonces)
         this.supabaseClient
-            .channel('public:paiements')
+            .channel('public:cagnotte_tables')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'paiements' }, (payload) => {
                 console.log('⚡ Événement Realtime Supabase reçu (table paiements):', payload);
                 this.notifyListeners({
@@ -294,6 +294,18 @@ class DataService {
                     eventType: 'UPDATE_PARTICIPANTS',
                     new: payload.new
                 });
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'annonces' }, (payload) => {
+                console.log('📢 Annonce en direct reçue de Supabase (table annonces):', payload);
+                if (window.notificationManager && payload.new) {
+                    window.notificationManager.handleBroadcastMessage({
+                        eventType: 'ANNOUNCEMENT',
+                        payload: {
+                            title: payload.new.titre,
+                            message: payload.new.message
+                        }
+                    });
+                }
             })
             .subscribe();
 
@@ -322,6 +334,7 @@ class DataService {
             payload: { title, message }
         };
 
+        // 1. Diffusion instantanée par WebSocket Realtime Broadcast
         if (this.broadcastChannelSupabase) {
             try {
                 await this.broadcastChannelSupabase.send({
@@ -329,9 +342,21 @@ class DataService {
                     event: 'cagnotte_event',
                     payload: eventData
                 });
-                console.log("✅ Message broadcast envoyé avec succès via Supabase");
+                console.log("✅ Message broadcast envoyé via Supabase");
             } catch (err) {
                 console.warn("Erreur envoi broadcast Supabase:", err);
+            }
+        }
+
+        // 2. Insertion en base Supabase pour réplication Postgres Realtime à tous les téléphones
+        if (this.isRealSupabase && this.supabaseClient) {
+            try {
+                await this.supabaseClient.from('annonces').insert([{
+                    titre: title,
+                    message: message
+                }]);
+            } catch (err) {
+                console.warn("Table annonces optionnelle:", err);
             }
         }
     }
