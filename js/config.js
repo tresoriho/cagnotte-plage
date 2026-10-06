@@ -28,6 +28,9 @@ const CONFIG = {
     // OneSignal App ID pour les notifications push en arrière-plan (écrans verrouillés)
     ONESIGNAL_APP_ID: "d3a5b43d-b59f-40ad-8f71-d0d5e13ad63a",
 
+    // Code secret d'accès Administrateur (permet de valider ou refuser les paiements)
+    ADMIN_PIN: "2026",
+
     // Mode démo / simulation actif si hors-ligne
     USE_LOCAL_STORAGE_FALLBACK: true,
 
@@ -76,6 +79,7 @@ const CONFIG = {
                     if (parsed.TARGET_PER_PARTICIPANT) this.TARGET_PER_PARTICIPANT = Number(parsed.TARGET_PER_PARTICIPANT);
                     if (parsed.TOTAL_CUSTOM_GOAL) this.TOTAL_CUSTOM_GOAL = Number(parsed.TOTAL_CUSTOM_GOAL);
                     if (parsed.WAVE_PAYMENT_URL) this.WAVE_PAYMENT_URL = parsed.WAVE_PAYMENT_URL;
+                    if (parsed.ADMIN_PIN) this.ADMIN_PIN = String(parsed.ADMIN_PIN);
                     if (parsed.HERO_IMAGE) this.HERO_IMAGE = parsed.HERO_IMAGE;
                     if (parsed.BOTTOM_BANNER_IMAGE) this.BOTTOM_BANNER_IMAGE = parsed.BOTTOM_BANNER_IMAGE;
                 }

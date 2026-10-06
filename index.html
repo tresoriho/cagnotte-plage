@@ -596,16 +596,53 @@
         <!-- 6. VUE ESPACE ADMINISTRATION PRIVÉ (ACCESSIBLE VIA ⚙️) -->
         <!-- ================================================================= -->
         <section id="view-admin" class="app-view hidden space-y-4">
-            <!-- Bannière Admin -->
-            <div class="card-ocean-dark p-6 text-white space-y-2">
-                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                    <span>⚙️</span> Espace Organisateur
+            <!-- ÉCRAN DE VERROUILLAGE / CODE PIN ADMIN (Réservé exclusivement à l'administrateur) -->
+            <div id="admin-lock-screen" class="card-premium p-6 space-y-5 text-center max-w-md mx-auto">
+                <div class="w-16 h-16 mx-auto rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center text-3xl shadow-md shadow-amber-500/10">
+                    🔐
                 </div>
-                <h2 class="font-heading text-2xl font-black text-white">Gestion de la Cagnotte</h2>
-                <p class="text-xs text-sky-100 leading-relaxed">
-                    Validez les versements, modifiez les participants, les détails de la sortie ou l'objectif total.
-                </p>
+                <div class="space-y-1.5">
+                    <h3 class="font-heading font-black text-xl text-slate-900">Espace Administrateur</h3>
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        Accès réservé exclusivement à l'administrateur pour valider ou refuser les versements et gérer la cagnotte.
+                    </p>
+                </div>
+                
+                <form id="admin-pin-form" class="space-y-3 pt-1">
+                    <div>
+                        <input type="password" id="admin-pin-input" placeholder="Entrez le code secret..." maxlength="20"
+                               class="w-full text-center px-4 py-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200 text-base font-black text-slate-900 focus:outline-none focus:border-amber-500 tracking-widest" autocomplete="current-password">
+                        <p id="admin-pin-error" class="text-xs text-rose-600 font-bold mt-1.5 hidden"></p>
+                    </div>
+                    
+                    <button type="submit" class="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-sm shadow-md transition-all flex items-center justify-center gap-2">
+                        <span>🔓</span>
+                        <span>Déverrouiller l'administration</span>
+                    </button>
+                    <button type="button" onclick="window.app.switchView('dashboard')" class="w-full py-2 text-xs text-slate-400 font-bold hover:text-slate-600">
+                        ← Retour au tableau de bord
+                    </button>
+                </form>
             </div>
+
+            <!-- CONTENU ADMINISTRATEUR (Déverrouillé après saisie du code PIN) -->
+            <div id="admin-main-panel" class="space-y-4 hidden">
+                <!-- Bannière Admin -->
+                <div class="card-ocean-dark p-6 text-white space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
+                            <span>⚙️</span> Espace Administrateur
+                        </div>
+                        <button onclick="window.adminManager.logout()" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1 active:scale-95" title="Verrouiller l'accès">
+                            <span>🔒</span>
+                            <span>Verrouiller</span>
+                        </button>
+                    </div>
+                    <h2 class="font-heading text-2xl font-black text-white">Gestion de la Cagnotte</h2>
+                    <p class="text-xs text-sky-100 leading-relaxed">
+                        Validez les versements, modifiez les participants, les détails de la sortie ou l'objectif total.
+                    </p>
+                </div>
 
             <!-- CARTE VERSEMENTS EN ATTENTE DE VALIDATION -->
             <div class="card-premium p-5 border-2 border-amber-300 bg-amber-50/30 space-y-4">
@@ -903,6 +940,7 @@
                     <!-- Rendu dynamique -->
                 </div>
             </div>
+            </div> <!-- Fin #admin-main-panel -->
 
         </section>
 

@@ -7,9 +7,57 @@ class AdminManager {
     constructor() {
         this.participants = [];
         this.payments = [];
+        this.AUTH_STORAGE_KEY = 'cagnotte_admin_authenticated_v1';
         if (typeof document !== 'undefined') {
             document.addEventListener('DOMContentLoaded', () => this.init());
         }
+    }
+
+    // Vérifie si l'administrateur est authentifié
+    isAuthenticated() {
+        try {
+            return sessionStorage.getItem(this.AUTH_STORAGE_KEY) === 'true' || localStorage.getItem(this.AUTH_STORAGE_KEY) === 'true';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Connexion avec le code PIN secret
+    login(enteredPin) {
+        const expectedPin = String(CONFIG.ADMIN_PIN || "2026").trim();
+        const pin = String(enteredPin || "").trim();
+
+        if (pin === expectedPin) {
+            sessionStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
+            localStorage.setItem(this.AUTH_STORAGE_KEY, 'true');
+            const errEl = document.getElementById('admin-pin-error');
+            if (errEl) errEl.classList.add('hidden');
+            if (window.notificationManager) {
+                window.notificationManager.showToast('Accès Administrateur déverrouillé ! 🔓', 'success', '👑');
+            }
+            this.renderAdminView();
+            return true;
+        } else {
+            const errEl = document.getElementById('admin-pin-error');
+            if (errEl) {
+                errEl.textContent = '❌ Code secret incorrect. Accès refusé.';
+                errEl.classList.remove('hidden');
+            }
+            if (window.notificationManager) {
+                window.notificationManager.showToast('Code incorrect. Accès réservé à l\'administrateur.', 'error', '🔒');
+            }
+            return false;
+        }
+    }
+
+    // Déconnexion et verrouillage de l'espace administrateur
+    logout() {
+        sessionStorage.removeItem(this.AUTH_STORAGE_KEY);
+        localStorage.removeItem(this.AUTH_STORAGE_KEY);
+        if (window.notificationManager) {
+            window.notificationManager.showToast('Espace Administrateur verrouillé.', 'info', '🔒');
+        }
+        this.renderAdminView();
     }
 
     init() {
@@ -23,6 +71,20 @@ class AdminManager {
     }
 
     bindEvents() {
+        // Formulaire de Code PIN Administrateur
+        const pinForm = document.getElementById('admin-pin-form');
+        const pinInput = document.getElementById('admin-pin-input');
+        const pinError = document.getElementById('admin-pin-error');
+
+        if (pinForm) {
+            pinForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (pinError) pinError.classList.add('hidden');
+                const ok = this.login(pinInput?.value);
+                if (ok && pinInput) pinInput.value = '';
+            });
+        }
+
         // Formulaire Réglages Généraux (Objectif total, Titre, etc.)
         const configForm = document.getElementById('admin-config-form');
         if (configForm) {
@@ -361,6 +423,11 @@ class AdminManager {
 
     // Supprimer un participant
     async deleteParticipant(id, nom) {
+        if (!this.isAuthenticated()) {
+            alert("Accès refusé : Seul l'administrateur avec code secret peut effectuer cette action.");
+            this.renderAdminView();
+            return;
+        }
         if (confirm(`Supprimer définitivement ${nom} de la liste ?`)) {
             await window.dataService.deleteParticipant(id);
             window.notificationManager.showToast(`${nom} supprimé(e).`, 'info', '🗑️');
@@ -369,14 +436,25 @@ class AdminManager {
 
     // Supprimer un versement individuel
     async deletePayment(id, nom, montant) {
+        if (!this.isAuthenticated()) {
+            alert("Accès refusé : Seul l'administrateur avec code secret peut effectuer cette action.");
+            this.renderAdminView();
+            return;
+        }
         if (confirm(`Supprimer ce versement de ${formatMoney(montant)} pour ${nom} ?`)) {
             await window.dataService.deletePayment(id);
             window.notificationManager.showToast(`Versement de ${formatMoney(montant)} supprimé.`, 'info', '🗑️');
         }
     }
 
-    // Valider un versement en attente par l'administrateur
+    // Valider un versement en attente (RÉSERVÉ EXCLUSIVEMENT À L'ADMINISTRATEUR)
     async validatePayment(id, nom, montant) {
+        if (!this.isAuthenticated()) {
+            alert("Accès refusé : Seul l'administrateur avec code secret a la possibilité de valider un paiement.");
+            this.renderAdminView();
+            return;
+        }
+
         if (confirm(`Confirmer la réception de ${formatMoney(montant)} pour ${nom} et l'ajouter à la cagnotte ?`)) {
             await window.dataService.validatePayment(id);
             window.notificationManager.showToast(`Paiement de ${nom} validé avec succès (+${formatMoney(montant)}) !`, 'success', '🎉', 'wave');
@@ -386,8 +464,14 @@ class AdminManager {
         }
     }
 
-    // Rejeter ou annuler un versement non reçu en attente
+    // Rejeter ou annuler un versement non reçu en attente (RÉSERVÉ EXCLUSIVEMENT À L'ADMINISTRATEUR)
     async rejectPayment(id, nom, montant) {
+        if (!this.isAuthenticated()) {
+            alert("Accès refusé : Seul l'administrateur avec code secret a la possibilité d'annuler ou refuser un paiement.");
+            this.renderAdminView();
+            return;
+        }
+
         if (confirm(`Annuler cette déclaration de versement de ${formatMoney(montant)} pour ${nom} (paiement non reçu sur Wave) ?`)) {
             await window.dataService.cancelPayment(id);
             window.notificationManager.showToast(`Déclaration de ${nom} annulée (non reçue).`, 'info', '❌');
@@ -396,6 +480,22 @@ class AdminManager {
 
     // Afficher et mettre à jour la vue d'administration
     renderAdminView() {
+        const lockScreen = document.getElementById('admin-lock-screen');
+        const mainPanel = document.getElementById('admin-main-panel');
+
+        // Si l'administrateur n'a pas déverrouillé avec son code PIN, afficher l'écran de verrouillage
+        if (!this.isAuthenticated()) {
+            if (lockScreen) lockScreen.classList.remove('hidden');
+            if (mainPanel) mainPanel.classList.add('hidden');
+            const pinInput = document.getElementById('admin-pin-input');
+            if (pinInput) setTimeout(() => pinInput.focus(), 150);
+            return;
+        }
+
+        // Si authentifié, afficher l'espace d'administration
+        if (lockScreen) lockScreen.classList.add('hidden');
+        if (mainPanel) mainPanel.classList.remove('hidden');
+
         // Toujours récupérer les données synchronisées les plus récentes
         if (window.app && Array.isArray(window.app.payments) && window.app.payments.length > 0) {
             this.payments = window.app.payments;
