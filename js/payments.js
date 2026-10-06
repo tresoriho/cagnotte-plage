@@ -405,34 +405,25 @@ class PaymentsManager {
                     </div>
 
                     <!-- Récapitulatif Final -->
-                    <div class="bg-emerald-50/80 rounded-2xl p-4 border border-emerald-200 mb-4 space-y-2 text-left">
+                    <div class="bg-emerald-50/80 rounded-2xl p-4 border border-emerald-200 mb-5 space-y-2.5 text-left">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-slate-500 font-medium">Participant :</span>
-                            <strong class="text-xs text-slate-900 font-black">${participant.nom}</strong>
+                            <strong class="text-sm text-slate-900 font-black">${participant.nom}</strong>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs text-slate-500 font-medium">Montant déclaré :</span>
-                            <strong class="text-base text-emerald-700 font-black">${formatMoney(amount)}</strong>
+                            <span class="text-xs text-slate-500 font-medium">Montant à enregistrer :</span>
+                            <strong class="text-lg text-emerald-700 font-black">${formatMoney(amount)}</strong>
                         </div>
-                        <div class="flex items-center justify-between pt-1 border-t border-emerald-200/60">
+                        <div class="flex items-center justify-between pt-2 border-t border-emerald-200/60">
                             <span class="text-[11px] text-slate-400">Réf. transaction :</span>
                             <span class="text-[11px] text-slate-700 font-mono font-bold">${txRef}</span>
                         </div>
                     </div>
 
-                    <!-- Champ Optionnel ID / Numéro Wave -->
-                    <div class="space-y-1.5 mb-5 text-left">
-                        <label class="text-xs font-bold text-slate-700 block">
-                            Numéro téléphone Wave ou Réf (Optionnel) :
-                        </label>
-                        <input type="text" id="wave-custom-tx-ref" placeholder="Ex: 0708091011 ou Référence Wave"
-                               class="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1dc3eb]">
-                    </div>
-
-                    <!-- Bouton Déclarer Versement -->
+                    <!-- Bouton Déclarer Versement Direct -->
                     <div class="space-y-2.5">
                         <button id="wave-confirm-btn"
-                                class="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 active:scale-98"
+                                class="w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 active:scale-98"
                                 onclick="window.paymentsManager.processWavePayment('${participant.id}', ${amount}, '${txRef}')">
                             <span>✅</span>
                             <span>Enregistrer mon versement</span>
@@ -471,11 +462,7 @@ class PaymentsManager {
     }
 
     // Traiter le paiement (simulateur ou vrai backend)
-    async processWavePayment(participantId, amount, defaultTxRef) {
-        const customRefInput = document.getElementById('wave-custom-tx-ref');
-        const customRef = customRefInput?.value?.trim();
-        const txRef = customRef ? `${defaultTxRef} (${customRef})` : defaultTxRef;
-
+    async processWavePayment(participantId, amount, txRef) {
         const confirmBtn = document.getElementById('wave-confirm-btn');
         if (confirmBtn) {
             confirmBtn.disabled = true;
