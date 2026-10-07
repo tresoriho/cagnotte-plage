@@ -280,6 +280,12 @@ class DataService {
             payment: targetPayment
         });
 
+        // 5. Envoi notification push OneSignal sur écran verrouillé
+        const participant = this.getLocalParticipants().find(p => String(p.id) === String(targetPayment?.participant_id));
+        const pName = participant ? participant.nom : 'Un membre';
+        const pMontant = targetPayment?.montant || 0;
+        this.sendRemotePush(`🌊 Versement validé !`, `${pName} a cotisé ${formatMoney(pMontant)} pour la sortie plage 🏖️`);
+
         return { success: true, payment: targetPayment };
     }
 
@@ -620,7 +626,7 @@ class DataService {
             });
     }
 
-    // Diffuser une annonce à tous les téléphones connectés
+    // Diffuser une annonce à tous les téléphones connectés (Realtime + Push OneSignal)
     async sendBroadcastAnnouncement(title, message) {
         const eventData = {
             eventType: 'ANNOUNCEMENT',
@@ -651,6 +657,27 @@ class DataService {
             } catch (err) {
                 console.warn("Table annonces optionnelle:", err);
             }
+        }
+
+        // 3. Envoi de la notification PUSH OneSignal en arrière-plan (réveil de l'écran verrouillé)
+        await this.sendRemotePush(title, message);
+    }
+
+    // Déclenchement de la notification Push globale en arrière-plan (OneSignal Serverless Function)
+    async sendRemotePush(title, message, url = window.location.origin) {
+        try {
+            await fetch('/.netlify/functions/send-push-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    message: message,
+                    url: url
+                })
+            });
+            console.log("📲 Notification Push OneSignal envoyée avec succès.");
+        } catch (e) {
+            console.warn("Échec envoi Push OneSignal distant:", e);
         }
     }
 

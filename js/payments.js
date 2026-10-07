@@ -74,12 +74,12 @@ class PaymentsManager {
             this.selectedParticipant = stats;
             this.renderParticipantSummary(stats);
 
-            // Conserver le montant sélectionné ou auto-ajuster
+            // Ne pas remplir automatiquement le montant (laisser le champ vide / 0 pour que le membre saisisse lui-même le montant souhaité)
             const input = document.getElementById('payment-amount-input');
-            if (input && (!this.currentAmount || this.currentAmount <= 0) && stats.remaining > 0) {
-                const defaultAmt = Math.min(1500, stats.remaining);
-                input.value = defaultAmt;
-                this.currentAmount = defaultAmt;
+            if (input && (!this.currentAmount || this.currentAmount <= 0)) {
+                input.value = '';
+                this.currentAmount = 0;
+                document.querySelectorAll('.quick-pill, .quick-amount-btn').forEach(b => b.classList.remove('active'));
             }
             this.updatePayButtonState();
         }
@@ -183,13 +183,51 @@ class PaymentsManager {
         `;
     }
 
+    // Calcul des frais de transaction obligatoires Wave (1.2%)
+    calculateWaveFee(amount) {
+        if (!amount || amount <= 0) return 0;
+        return Math.ceil(amount * 0.012);
+    }
+
+    calculateTotalWithFee(amount) {
+        return amount + this.calculateWaveFee(amount);
+    }
+
     updatePayButtonState() {
         const btn = document.getElementById('wave-pay-btn');
+        const btnText = document.getElementById('wave-pay-btn-text');
         const errorEl = document.getElementById('payment-validation-error');
+        const feeBreakdown = document.getElementById('payment-fee-breakdown');
+        const baseEl = document.getElementById('breakdown-base-amount');
+        const feeEl = document.getElementById('breakdown-fee-amount');
+        const totalEl = document.getElementById('breakdown-total-amount');
+
         if (!btn) return;
 
         let errorMsg = '';
         let isValid = true;
+
+        const fee = this.calculateWaveFee(this.currentAmount);
+        const totalWithFee = this.currentAmount + fee;
+
+        if (feeBreakdown) {
+            if (this.currentAmount > 0) {
+                feeBreakdown.classList.remove('hidden');
+                if (baseEl) baseEl.textContent = formatMoney(this.currentAmount);
+                if (feeEl) feeEl.textContent = `+${formatMoney(fee)}`;
+                if (totalEl) totalEl.textContent = formatMoney(totalWithFee);
+            } else {
+                feeBreakdown.classList.add('hidden');
+            }
+        }
+
+        if (btnText) {
+            if (this.currentAmount > 0) {
+                btnText.textContent = `Payer ${formatMoney(totalWithFee)} avec Wave →`;
+            } else {
+                btnText.textContent = `Payer avec Wave →`;
+            }
+        }
 
         if (!this.selectedParticipant) {
             isValid = false;
@@ -202,7 +240,7 @@ class PaymentsManager {
             errorMsg = "Veuillez saisir un montant supérieur à 0 FCFA.";
         } else if (this.currentAmount > this.selectedParticipant.remaining) {
             isValid = false;
-            errorMsg = `Le montant ne peut pas dépasser le reste à payer (${formatMoney(this.selectedParticipant.remaining)}).`;
+            errorMsg = `Le montant de cotisation ne peut pas dépasser le reste à payer (${formatMoney(this.selectedParticipant.remaining)}).`;
         }
 
         // Le bouton reste TOUJOURS avec sa couleur bleu Wave vive sans opacité
@@ -266,10 +304,19 @@ class PaymentsManager {
 
     // Modal de confirmation & paiement Wave en 2 étapes obligatoires
     openWaveCheckoutModal(participant, amount) {
+        if (this.step1Timer) {
+            clearInterval(this.step1Timer);
+            this.step1Timer = null;
+        }
+
         this.checkoutParticipant = participant;
         this.checkoutAmount = amount;
+        this.checkoutFee = this.calculateWaveFee(amount);
+        this.checkoutTotal = amount + this.checkoutFee;
         this.checkoutTxRef = `WAVE_TX_${Date.now().toString().slice(-6)}`;
         this.checkoutStep1Completed = false;
+        this.step1SecondsLeft = 10;
+        this.step1Unlocked = false;
 
         this.renderCheckoutStep(1);
 
@@ -285,13 +332,15 @@ class PaymentsManager {
         if (!modalContent) return;
 
         const participant = this.checkoutParticipant;
-        const amount = this.checkoutAmount;
+        const baseAmount = this.checkoutAmount;
+        const fee = this.checkoutFee || this.calculateWaveFee(baseAmount);
+        const totalAmount = this.checkoutTotal || (baseAmount + fee);
         const txRef = this.checkoutTxRef;
 
         const rawBaseUrl = (CONFIG.WAVE_PAYMENT_URL || "https://pay.wave.com/m/M_ci_NvjJ2LHyaS6A/c/ci/").trim();
         const cleanBase = rawBaseUrl.replace(/\/+$/, '');
         const separator = cleanBase.includes('?') ? '&' : '?';
-        const waveUrlWithAmount = `${cleanBase}${separator}amount=${amount}&a=${amount}`;
+        const waveUrlWithAmount = `${cleanBase}${separator}amount=${totalAmount}&a=${totalAmount}`;
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waveUrlWithAmount)}`;
 
         if (step === 1) {
@@ -325,11 +374,16 @@ class PaymentsManager {
                         </div>
                     </div>
 
-                    <!-- Récapitulatif du montant -->
-                    <div class="bg-sky-50/80 rounded-2xl p-3.5 border border-sky-200 mb-4 text-center">
-                        <span class="text-xs text-sky-800 font-medium block mb-0.5">Montant à verser</span>
-                        <div class="text-3xl font-black text-slate-900 tracking-tight">${formatMoney(amount)}</div>
-                        <span class="text-xs text-slate-500 mt-0.5 block">Participant : <strong>${participant.nom}</strong></span>
+                    <!-- Récapitulatif du montant avec Frais 1.2% -->
+                    <div class="bg-sky-50/90 rounded-2xl p-3.5 border border-sky-200 mb-4 text-center space-y-1">
+                        <span class="text-xs text-sky-800 font-medium block">Total à transférer sur Wave</span>
+                        <div class="text-3xl font-black text-slate-900 tracking-tight">${formatMoney(totalAmount)}</div>
+                        <div class="flex items-center justify-center gap-2 text-[11px] text-slate-500 font-medium pt-1 border-t border-sky-200/60 mt-1.5">
+                            <span>Cotisation : <strong>${formatMoney(baseAmount)}</strong></span>
+                            <span>•</span>
+                            <span class="text-sky-700 font-bold">Frais 1.2% : +${formatMoney(fee)}</span>
+                        </div>
+                        <span class="text-[11px] text-slate-500 mt-0.5 block">Participant : <strong class="text-slate-900">${participant.nom}</strong></span>
                     </div>
 
                     <!-- ÉTAPE 1 : BOUTON ET QR CODE -->
@@ -345,7 +399,7 @@ class PaymentsManager {
                            onclick="window.paymentsManager.markStep1Initiated()"
                            class="w-full py-3.5 px-4 rounded-xl bg-[#1dc3eb] hover:bg-[#18b0d5] active:scale-95 text-white font-black text-sm shadow-md shadow-[#1dc3eb]/30 transition-all flex items-center justify-center gap-2">
                             <img src="assets/images/wave-logo.png" alt="Wave" class="w-5 h-5 rounded-full object-cover">
-                            <span>Ouvrir Wave et Payer (${formatMoney(amount)})</span>
+                            <span>Ouvrir Wave et Payer (${formatMoney(totalAmount)})</span>
                             <span>↗</span>
                         </a>
 
@@ -358,16 +412,20 @@ class PaymentsManager {
                         </div>
                     </div>
 
-                    <!-- BOUTON DE PASSAGE OBLIGATOIRE À L'ÉTAPE 2 -->
+                    <!-- BOUTON DE PASSAGE AVEC COMPTE À REBOURS DE 10 SECONDES -->
                     <div class="space-y-2">
+                        <!-- Barre de progression du timer (10 secondes) -->
+                        <div id="step1-timer-progress-bar-container" class="hidden w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                            <div id="step1-timer-progress-bar" class="bg-[#1dc3eb] h-full rounded-full transition-all duration-1000 ease-linear" style="width: 0%;"></div>
+                        </div>
+
                         <button id="step1-proceed-btn"
-                                onclick="window.paymentsManager.proceedToStep2()"
+                                onclick="window.paymentsManager.triggerStep1Proceed()"
                                 class="w-full py-3.5 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black text-sm shadow-lg transition-all flex items-center justify-center gap-2 active:scale-98">
-                            <span>J'ai effectué le paiement Wave</span>
-                            <span>→ Passer à l'étape 2</span>
+                            <span id="step1-proceed-btn-text">J'ai effectué le paiement Wave → Passer à l'étape 2</span>
                         </button>
-                        <p class="text-[10px] text-slate-400 text-center font-medium">
-                            🔒 Vous devez avoir envoyé l'argent sur Wave avant de passer à l'étape suivante.
+                        <p id="step1-proceed-hint" class="text-[10px] text-slate-400 text-center font-medium">
+                            🔒 Vous devez avoir validé le paiement sur Wave. Un délai de 10 secondes est requis pour finaliser l'étape 1.
                         </p>
                     </div>
                 </div>
@@ -411,8 +469,12 @@ class PaymentsManager {
                             <strong class="text-sm text-slate-900 font-black">${participant.nom}</strong>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs text-slate-500 font-medium">Montant à enregistrer :</span>
-                            <strong class="text-lg text-emerald-700 font-black">${formatMoney(amount)}</strong>
+                            <span class="text-xs text-slate-500 font-medium">Cotisation cagnotte :</span>
+                            <strong class="text-lg text-emerald-700 font-black">${formatMoney(baseAmount)}</strong>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-slate-600">
+                            <span>Frais Wave (1.2%) inclus :</span>
+                            <span class="font-bold text-slate-800">${formatMoney(fee)} (Total : ${formatMoney(totalAmount)})</span>
                         </div>
                         <div class="flex items-center justify-between pt-2 border-t border-emerald-200/60">
                             <span class="text-[11px] text-slate-400">Réf. transaction :</span>
@@ -424,7 +486,7 @@ class PaymentsManager {
                     <div class="space-y-2.5">
                         <button id="wave-confirm-btn"
                                 class="w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 active:scale-98"
-                                onclick="window.paymentsManager.processWavePayment('${participant.id}', ${amount}, '${txRef}')">
+                                onclick="window.paymentsManager.processWavePayment('${participant.id}', ${baseAmount}, '${txRef}')">
                             <span>✅</span>
                             <span>Enregistrer mon versement</span>
                         </button>
@@ -441,19 +503,96 @@ class PaymentsManager {
 
     markStep1Initiated() {
         this.checkoutStep1Completed = true;
-        const btn = document.getElementById('step1-proceed-btn');
-        if (btn) {
-            btn.classList.remove('bg-slate-900');
-            btn.classList.add('bg-emerald-600', 'animate-bounce');
-            btn.innerHTML = `<span>✓ Wave ouvert ! Passer à l'étape 2 →</span>`;
+        this.startStep1Cooldown();
+    }
+
+    triggerStep1Proceed() {
+        if (this.step1Unlocked) {
+            this.proceedToStep2();
+            return;
+        }
+
+        // Si le compte à rebours n'a pas encore démarré, le lancer
+        if (!this.step1Timer) {
+            this.startStep1Cooldown();
         }
     }
 
+    // Compte à rebours de 10 secondes obligatoire pour finaliser l'étape 1
+    startStep1Cooldown() {
+        if (this.step1Timer) return;
+
+        this.step1SecondsLeft = 10;
+        this.step1Unlocked = false;
+
+        const btn = document.getElementById('step1-proceed-btn');
+        const btnText = document.getElementById('step1-proceed-btn-text');
+        const progressContainer = document.getElementById('step1-timer-progress-bar-container');
+        const progressBar = document.getElementById('step1-timer-progress-bar');
+        const hint = document.getElementById('step1-proceed-hint');
+
+        if (progressContainer) progressContainer.classList.remove('hidden');
+
+        const updateUi = () => {
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.remove('bg-slate-900', 'bg-emerald-600');
+                btn.classList.add('bg-slate-700', 'cursor-not-allowed', 'opacity-90');
+            }
+            if (btnText) {
+                btnText.innerHTML = `⏳ Vérification du paiement Wave... (<strong class="text-amber-300 font-mono text-base">${this.step1SecondsLeft}s</strong>)`;
+            }
+            if (progressBar) {
+                const percent = Math.min(100, Math.round(((10 - this.step1SecondsLeft) / 10) * 100));
+                progressBar.style.width = `${percent}%`;
+            }
+            if (hint) {
+                hint.textContent = "⏳ Merci de patienter pendant la vérification du transfert Wave...";
+            }
+        };
+
+        updateUi();
+
+        this.step1Timer = setInterval(() => {
+            this.step1SecondsLeft--;
+            
+            if (this.step1SecondsLeft > 0) {
+                updateUi();
+            } else {
+                clearInterval(this.step1Timer);
+                this.step1Timer = null;
+                this.step1Unlocked = true;
+
+                if (progressBar) progressBar.style.width = `100%`;
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('bg-slate-700', 'cursor-not-allowed', 'opacity-90');
+                    btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'animate-pulse');
+                }
+                if (btnText) {
+                    btnText.innerHTML = `<span>✅ Transfert validé ! Passer à l'étape 2 →</span>`;
+                }
+                if (hint) {
+                    hint.innerHTML = `<span class="text-emerald-600 font-bold">✨ Étape 1 validée avec succès. Vous pouvez finaliser l'étape 2 !</span>`;
+                }
+            }
+        }, 1000);
+    }
+
     proceedToStep2() {
+        if (this.step1Timer) {
+            clearInterval(this.step1Timer);
+            this.step1Timer = null;
+        }
         this.renderCheckoutStep(2);
     }
 
     closeWaveModal() {
+        if (this.step1Timer) {
+            clearInterval(this.step1Timer);
+            this.step1Timer = null;
+        }
         const modal = document.getElementById('wave-checkout-modal');
         if (modal) {
             modal.classList.add('hidden');

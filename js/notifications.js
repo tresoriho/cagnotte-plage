@@ -54,11 +54,17 @@ class NotificationManager {
             this.showInstallBanner('android');
         });
 
-        // Détection de l'installation réussie
+        // Détection de l'installation réussie : activation automatique et définitive
         window.addEventListener('appinstalled', () => {
             this.deferredPrompt = null;
             this.hideInstallBanner();
+            localStorage.setItem('cagnotte_pwa_installed', 'true');
             this.showInfo("🎉 Application installée avec succès sur votre écran d'accueil !", "info");
+            
+            // Activation automatique immédiate des notifications après installation
+            setTimeout(() => {
+                this.requestNotificationPermission(true);
+            }, 500);
         });
 
         // 4. Détection iOS pour proposer l'installation si l'utilisateur est sur iPhone / iPad et pas encore en mode standalone
@@ -66,6 +72,65 @@ class NotificationManager {
 
         // 5. Mettre à jour l'état du bouton de cloche de notification
         this.updateNotificationUiState();
+
+        // 6. Activation automatique permanente dès le premier accès / ouverture
+        this.autoActivateNotifications();
+    }
+
+    // Auto-activation permanente dès le 1er accès ou en mode PWA installé
+    autoActivateNotifications() {
+        // A. Si les notifications sont déjà autorisées
+        if ('Notification' in window && Notification.permission === 'granted') {
+            localStorage.setItem('cagnotte_notifications_enabled', 'true');
+            this.updateNotificationUiState();
+            
+            if (window.OneSignalDeferred) {
+                window.OneSignalDeferred.push(async function(OneSignal) {
+                    try {
+                        if (OneSignal.User && OneSignal.User.PushSubscription) {
+                            await OneSignal.User.PushSubscription.optIn();
+                        }
+                    } catch (e) {}
+                });
+            }
+            return;
+        }
+
+        // B. Si l'application est lancée en mode autonome (installée sur l'écran d'accueil)
+        if (this.isStandalone()) {
+            setTimeout(() => {
+                this.requestNotificationPermission(false);
+            }, 800);
+        }
+
+        // C. Si l'utilisateur accède pour la première fois (permission pas encore demandée)
+        if ('Notification' in window && Notification.permission === 'default') {
+            // 1. Tenter la demande directe
+            try {
+                const req = Notification.requestPermission();
+                if (req && typeof req.then === 'function') {
+                    req.then((perm) => {
+                        this.updateNotificationUiState();
+                        if (perm === 'granted') {
+                            localStorage.setItem('cagnotte_notifications_enabled', 'true');
+                            this.showToast("🔔 Notifications activées automatiquement !", "success", "🔔");
+                        }
+                    }).catch(() => {});
+                }
+            } catch (e) {}
+
+            // 2. Déclencheur sur la 1ère interaction (clic/toucher) au cas où le navigateur bloque l'auto-popup
+            const triggerOnFirstInteraction = () => {
+                if ('Notification' in window && Notification.permission === 'default') {
+                    this.requestNotificationPermission(false);
+                }
+                document.removeEventListener('click', triggerOnFirstInteraction, true);
+                document.removeEventListener('touchstart', triggerOnFirstInteraction, true);
+            };
+
+            document.addEventListener('click', triggerOnFirstInteraction, { once: true, capture: true });
+            document.addEventListener('touchstart', triggerOnFirstInteraction, { once: true, capture: true });
+        }
     }
 
     // Vérifie si l'application s'exécute déjà en mode autonome (installée)
@@ -133,6 +198,11 @@ class NotificationManager {
         this.deferredPrompt.prompt();
         const { outcome } = await this.deferredPrompt.userChoice;
         console.log(`Résultat de l'installation : ${outcome}`);
+        if (outcome === 'accepted') {
+            setTimeout(() => {
+                this.requestNotificationPermission(true);
+            }, 600);
+        }
         this.deferredPrompt = null;
         this.hideInstallBanner();
     }
@@ -155,15 +225,19 @@ class NotificationManager {
     }
 
     // Demande de permission pour les notifications natives
-    async requestNotificationPermission() {
+    async requestNotificationPermission(showFeedback = true) {
         if (!('Notification' in window)) {
             const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
             if (isIos && !this.isStandalone()) {
                 this.showIosGuideModal();
-                this.showToast("Sur iPhone, ajoutez l'app sur l'écran d'accueil pour activer les notifications système !", "info", "📲");
+                if (showFeedback) {
+                    this.showToast("Sur iPhone, ajoutez l'app sur l'écran d'accueil pour activer les notifications système !", "info", "📲");
+                }
                 return false;
             }
-            this.showToast("Les notifications sont synchronisées en direct dans l'application !", "info", "🔔");
+            if (showFeedback) {
+                this.showToast("Les notifications sont synchronisées en direct dans l'application !", "info", "🔔");
+            }
             return false;
         }
 
@@ -175,6 +249,9 @@ class NotificationManager {
                         if (OneSignal.Notifications && OneSignal.Notifications.requestPermission) {
                             await OneSignal.Notifications.requestPermission();
                         }
+                        if (OneSignal.User && OneSignal.User.PushSubscription) {
+                            await OneSignal.User.PushSubscription.optIn();
+                        }
                     } catch (e) {
                         console.warn("OneSignal permission call:", e);
                     }
@@ -185,14 +262,19 @@ class NotificationManager {
             this.updateNotificationUiState();
 
             if (permission === 'granted') {
-                this.showToast("Super ! Notifications push activées sur votre appareil.", "success", "🔔");
-                this.sendNativeNotification("🏖️ Notifications Activées !", {
-                    body: "Vous serez averti en direct à chaque cotisation ou annonce.",
-                    icon: './assets/icons/icon-192.png'
-                });
+                localStorage.setItem('cagnotte_notifications_enabled', 'true');
+                if (showFeedback) {
+                    this.showToast("Super ! Notifications push activées sur votre appareil.", "success", "🔔");
+                    this.sendNativeNotification("🏖️ Notifications Activées !", {
+                        body: "Vous serez averti(e) en direct à chaque cotisation ou annonce.",
+                        icon: './assets/icons/icon-192.png'
+                    });
+                }
                 return true;
             } else {
-                this.showToast("Notifications désactivées ou en attente.", "warning", "🔕");
+                if (showFeedback) {
+                    this.showToast("Notifications désactivées ou en attente.", "warning", "🔕");
+                }
                 return false;
             }
         } catch (err) {

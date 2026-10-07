@@ -3,7 +3,14 @@
  * Gère le cache hors-ligne, les notifications PUSH natives et l'installation PWA.
  */
 
-const CACHE_NAME = 'cagnotte-plage-v1.3';
+// Import du worker OneSignal pour les notifications push réveil en arrière-plan
+try {
+    importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+} catch (e) {
+    // Fallback silencieux en environnement hors-ligne ou local
+}
+
+const CACHE_NAME = 'cagnotte-plage-v1.4';
 const STATIC_ASSETS = [
     './',
     './index.html',

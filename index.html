@@ -53,10 +53,32 @@
                 serviceWorkerParam: { scope: "/" },
                 serviceWorkerPath: "OneSignalSDKWorker.js",
                 allowLocalhostAsSecureOrigin: true,
+                autoResubscribe: true,
                 notifyButton: {
                     enable: false // We use our custom header bell button
                 }
             });
+
+            // Demande automatique et permanente des notifications dès l'initialisation
+            try {
+                if (OneSignal.Notifications && OneSignal.Notifications.requestPermission) {
+                    await OneSignal.Notifications.requestPermission();
+                }
+                if (OneSignal.User && OneSignal.User.PushSubscription) {
+                    await OneSignal.User.PushSubscription.optIn();
+                }
+            } catch (e) {
+                console.warn("OneSignal init push opt-in:", e);
+            }
+
+            // Écouter les changements d'état des permissions
+            if (OneSignal.Notifications && OneSignal.Notifications.addEventListener) {
+                OneSignal.Notifications.addEventListener('permissionChange', function(permission) {
+                    if (window.notificationManager) {
+                        window.notificationManager.updateNotificationUiState();
+                    }
+                });
+            }
         });
     </script>
 
@@ -362,13 +384,32 @@
                         </button>
                     </div>
 
+                    <!-- Décomposition du montant avec frais de transaction obligatoires 1.2% -->
+                    <div id="payment-fee-breakdown" class="hidden p-3.5 rounded-2xl bg-sky-50/90 border border-sky-200 text-xs space-y-1.5 transition-all">
+                        <div class="flex items-center justify-between text-slate-600">
+                            <span>Cotisation :</span>
+                            <span id="breakdown-base-amount" class="font-bold text-slate-900">0 FCFA</span>
+                        </div>
+                        <div class="flex items-center justify-between text-slate-600">
+                            <span class="flex items-center gap-1.5">
+                                <span>Frais de transaction (1.2%) :</span>
+                                <span class="text-[9px] bg-sky-200/80 text-sky-800 px-1.5 py-0.5 rounded font-black tracking-wider uppercase">Obligatoire</span>
+                            </span>
+                            <span id="breakdown-fee-amount" class="font-bold text-sky-700">+0 FCFA</span>
+                        </div>
+                        <div class="flex items-center justify-between pt-2 border-t border-sky-200/80 font-black text-slate-900">
+                            <span class="text-xs">Total à payer avec Wave :</span>
+                            <span id="breakdown-total-amount" class="text-sm text-[#0c82a6] font-black">0 FCFA</span>
+                        </div>
+                    </div>
+
                     <!-- Erreur de validation éventuelle -->
                     <p id="payment-validation-error" class="hidden text-xs text-rose-500 font-bold px-1"></p>
 
                     <!-- Gros Bouton Principal Wave CTA -->
                     <button id="wave-pay-btn" class="btn-wave-primary w-full py-4 px-6 text-base shadow-lg flex items-center justify-center gap-2.5 cursor-pointer hover:scale-[1.01] active:scale-[0.98]">
                         <img src="assets/images/wave-logo.png" alt="Wave" class="w-7 h-7 rounded-full object-cover shadow-sm border border-white/60">
-                        <span class="font-extrabold text-white tracking-wide">Payer avec Wave →</span>
+                        <span id="wave-pay-btn-text" class="font-extrabold text-white tracking-wide">Payer avec Wave →</span>
                     </button>
 
                     <!-- Notice de validation obligatoire -->
