@@ -89,6 +89,21 @@ class DataService {
         }
     }
 
+    // Normalisation stricte et universelle des statuts : 'pending', 'confirmed', 'cancelled'
+    normalizePayment(p) {
+        if (!p) return p;
+        let st = (p.statut || p.status || 'pending').toLowerCase().trim();
+        if (st === 'completed' || st === 'valide' || st === 'validé' || st === 'success') {
+            st = 'confirmed';
+        } else if (st === 'en_attente' || st === 'attente' || st === 'waiting') {
+            st = 'pending';
+        } else if (st === 'refused' || st === 'refuse' || st === 'annule' || st === 'annulé') {
+            st = 'cancelled';
+        }
+        p.statut = st;
+        return p;
+    }
+
     // Récupérer tous les paiements (validés et en attente)
     async getPayments() {
         if (this.isRealSupabase && this.supabaseClient) {
@@ -101,8 +116,9 @@ class DataService {
                 return this.getLocalPayments();
             }
             if (data && Array.isArray(data)) {
-                localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(data));
-                return data;
+                const normalized = data.map(p => this.normalizePayment(p));
+                localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(normalized));
+                return normalized;
             }
             return this.getLocalPayments();
         }
@@ -113,8 +129,9 @@ class DataService {
         try {
             const raw = localStorage.getItem(this.STORAGE_KEY_PAYMENTS);
             const list = raw ? JSON.parse(raw) : CONFIG.INITIAL_PAYMENTS;
+            const normalized = (list || []).map(p => this.normalizePayment(p));
             // Tri du plus récent au plus ancien
-            return list.sort((a, b) => new Date(b.created_at || b.paid_at) - new Date(a.created_at || a.paid_at));
+            return normalized.sort((a, b) => new Date(b.created_at || b.paid_at) - new Date(a.created_at || a.paid_at));
         } catch (e) {
             return CONFIG.INITIAL_PAYMENTS;
         }
@@ -122,14 +139,21 @@ class DataService {
 
     // Enregistrer un nouveau paiement (statut 'pending' par défaut pour validation admin)
     async addPayment(paymentPayload) {
+        const nowIso = new Date().toISOString();
         const newPayment = {
             id: 'pay-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
             participant_id: String(paymentPayload.participant_id),
             montant: Number(paymentPayload.montant),
-            wave_transaction_id: paymentPayload.wave_transaction_id || `WAVE_TX_${Math.floor(1000 + Math.random() * 9000)}`,
-            statut: paymentPayload.statut || 'pending', // 'pending' (en attente admin) ou 'completed'
-            created_at: new Date().toISOString(),
-            paid_at: paymentPayload.statut === 'completed' ? new Date().toISOString() : null
+            wave_transaction_id: paymentPayload.wave_transaction_id || `WAVE_TX_${Math.floor(100000 + Math.random() * 900000)}`,
+            wave_checkout_id: paymentPayload.wave_checkout_id || null,
+            statut: 'pending', // Strictement 'pending'
+            created_at: nowIso,
+            updated_at: nowIso,
+            paid_at: null,
+            validated_at: null,
+            cancelled_at: null,
+            validated_by: null,
+            cancel_reason: null
         };
 
         // 1. Sauvegarde locale immédiate
@@ -137,17 +161,28 @@ class DataService {
 
         let finalPayment = newPayment;
 
-        // 2. Insertion dans Supabase
+        // 2. Insertion dans Supabase (colonnes standardisées)
         if (this.isRealSupabase && this.supabaseClient) {
             try {
+                const supabaseRow = {
+                    id: newPayment.id,
+                    participant_id: String(paymentPayload.participant_id),
+                    montant: Number(paymentPayload.montant),
+                    wave_transaction_id: newPayment.wave_transaction_id,
+                    wave_checkout_id: newPayment.wave_checkout_id,
+                    statut: 'pending',
+                    created_at: nowIso,
+                    paid_at: null
+                };
+
                 const { data, error } = await this.supabaseClient
                     .from('paiements')
-                    .insert([newPayment])
+                    .insert([supabaseRow])
                     .select();
                 if (error) {
                     console.error("Erreur insertion paiement Supabase:", error);
                 } else if (data && data[0]) {
-                    finalPayment = data[0];
+                    finalPayment = this.normalizePayment(data[0]);
                 }
             } catch (err) {
                 console.warn("Exception insert Supabase:", err);
@@ -163,74 +198,172 @@ class DataService {
         return finalPayment;
     }
 
-    // Valider un paiement en attente par l'administrateur
-    async validatePayment(id) {
+    // Valider un paiement en attente par l'administrateur (Protection Concurrence / Anti-double validation)
+    async validatePayment(id, validatedBy = 'Administrateur') {
+        const nowIso = new Date().toISOString();
         let payments = this.getLocalPayments();
-        let targetPayment = null;
+        let targetPayment = payments.find(p => String(p.id) === String(id));
+
+        // 1. Vérification côté Supabase si disponible pour éviter double validation concurrente
+        if (this.isRealSupabase && this.supabaseClient) {
+            try {
+                const { data: remoteData, error: fetchErr } = await this.supabaseClient
+                    .from('paiements')
+                    .select('*')
+                    .eq('id', id)
+                    .maybeSingle();
+
+                if (!fetchErr && remoteData) {
+                    const st = (remoteData.statut || '').toLowerCase().trim();
+                    if (st === 'confirmed' || st === 'completed') {
+                        return { success: false, code: 'ALREADY_CONFIRMED', message: 'Ce versement a déjà été validé.' };
+                    }
+                    if (st === 'cancelled' || st === 'refused') {
+                        return { success: false, code: 'ALREADY_CANCELLED', message: 'Ce versement a déjà été annulé.' };
+                    }
+                }
+            } catch (e) {
+                console.warn("Vérification distante Supabase impossible:", e);
+            }
+        } else if (targetPayment) {
+            const st = (targetPayment.statut || '').toLowerCase().trim();
+            if (st === 'confirmed' || st === 'completed') {
+                return { success: false, code: 'ALREADY_CONFIRMED', message: 'Ce versement a déjà été validé.' };
+            }
+            if (st === 'cancelled' || st === 'refused') {
+                return { success: false, code: 'ALREADY_CANCELLED', message: 'Ce versement a déjà été annulé.' };
+            }
+        }
+
+        // 2. Mise à jour de l'objet de versement
         payments = payments.map(p => {
             if (String(p.id) === String(id)) {
-                p.statut = 'completed';
-                p.paid_at = new Date().toISOString();
+                p.statut = 'confirmed';
+                p.paid_at = nowIso;
+                p.validated_at = nowIso;
+                p.validated_by = validatedBy;
+                p.updated_at = nowIso;
                 targetPayment = p;
             }
             return p;
         });
         localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
 
+        // 3. Mise à jour en base Supabase (statut 'confirmed' avec compatibilité 'completed')
         if (this.isRealSupabase && this.supabaseClient) {
             try {
-                await this.supabaseClient
+                const { error: errConfirmed } = await this.supabaseClient
                     .from('paiements')
-                    .update({ statut: 'completed', paid_at: new Date().toISOString() })
+                    .update({ 
+                        statut: 'confirmed', 
+                        paid_at: nowIso
+                    })
                     .eq('id', id);
+
+                if (errConfirmed) {
+                    await this.supabaseClient
+                        .from('paiements')
+                        .update({ 
+                            statut: 'completed', 
+                            paid_at: nowIso
+                        })
+                        .eq('id', id);
+                }
             } catch (e) {
-                console.warn("Erreur update Supabase:", e);
+                console.warn("Erreur update Supabase validatePayment:", e);
             }
         }
 
+        // 4. Notification des écouteurs
         this.notifyListeners({
             eventType: 'VALIDATE_PAYMENT',
             payment: targetPayment
         });
 
-        return targetPayment;
+        return { success: true, payment: targetPayment };
     }
 
-    // Annuler ou rejeter un paiement
-    async cancelPayment(id) {
+    // Annuler ou rejeter un versement en attente (avec motif)
+    async cancelPayment(id, reason = 'Paiement non reçu') {
+        const nowIso = new Date().toISOString();
         let payments = this.getLocalPayments();
-        let targetPayment = null;
+        let targetPayment = payments.find(p => String(p.id) === String(id));
+
+        // 1. Vérification côté Supabase pour éviter double traitement concurrent
+        if (this.isRealSupabase && this.supabaseClient) {
+            try {
+                const { data: remoteData, error: fetchErr } = await this.supabaseClient
+                    .from('paiements')
+                    .select('*')
+                    .eq('id', id)
+                    .maybeSingle();
+
+                if (!fetchErr && remoteData) {
+                    const st = (remoteData.statut || '').toLowerCase().trim();
+                    if (st === 'confirmed' || st === 'completed') {
+                        return { success: false, code: 'ALREADY_CONFIRMED', message: 'Ce versement a déjà été validé et ne peut plus être annulé.' };
+                    }
+                    if (st === 'cancelled' || st === 'refused') {
+                        return { success: false, code: 'ALREADY_CANCELLED', message: 'Ce versement a déjà été annulé.' };
+                    }
+                }
+            } catch (e) {
+                console.warn("Vérification distante Supabase impossible:", e);
+            }
+        } else if (targetPayment) {
+            const st = (targetPayment.statut || '').toLowerCase().trim();
+            if (st === 'confirmed' || st === 'completed') {
+                return { success: false, code: 'ALREADY_CONFIRMED', message: 'Ce versement a déjà été validé et ne peut plus être annulé.' };
+            }
+            if (st === 'cancelled' || st === 'refused') {
+                return { success: false, code: 'ALREADY_CANCELLED', message: 'Ce versement a déjà été annulé.' };
+            }
+        }
+
+        // 2. Mise à jour locale
         payments = payments.map(p => {
             if (String(p.id) === String(id)) {
                 p.statut = 'cancelled';
+                p.cancelled_at = nowIso;
+                p.cancel_reason = reason;
+                p.updated_at = nowIso;
                 targetPayment = p;
             }
             return p;
         });
         localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
 
+        // 3. Mise à jour Supabase
         if (this.isRealSupabase && this.supabaseClient) {
             try {
                 await this.supabaseClient
                     .from('paiements')
-                    .update({ statut: 'cancelled' })
+                    .update({ 
+                        statut: 'cancelled'
+                    })
                     .eq('id', id);
             } catch (e) {
                 console.warn("Erreur cancel Supabase:", e);
             }
         }
 
+        // 4. Notification des écouteurs
         this.notifyListeners({
             eventType: 'CANCEL_PAYMENT',
             payment: targetPayment
         });
 
-        return targetPayment;
+        return { success: true, payment: targetPayment };
     }
 
     savePaymentLocally(payment) {
-        const currentPayments = this.getLocalPayments();
-        currentPayments.unshift(payment);
+        let currentPayments = this.getLocalPayments();
+        const existingIdx = currentPayments.findIndex(p => String(p.id) === String(payment.id));
+        if (existingIdx >= 0) {
+            currentPayments[existingIdx] = payment;
+        } else {
+            currentPayments.unshift(payment);
+        }
         localStorage.setItem(this.STORAGE_KEY_PAYMENTS, JSON.stringify(currentPayments));
     }
 

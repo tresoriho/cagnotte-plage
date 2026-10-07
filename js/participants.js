@@ -69,7 +69,10 @@ class ParticipantsManager {
 
     // Calculer les statistiques d'un participant
     calculateStats(participant, payments) {
-        const participantPayments = (payments || []).filter(p => String(p.participant_id) === String(participant.id) && p.statut === 'completed');
+        const participantPayments = (payments || []).filter(p => {
+            const st = (p.statut || '').toLowerCase().trim();
+            return String(p.participant_id) === String(participant.id) && (st === 'confirmed' || st === 'completed');
+        });
         const totalPaid = participantPayments.reduce((acc, curr) => acc + Number(curr.montant || 0), 0);
         const target = Number(participant.objectif || CONFIG.TARGET_PER_PARTICIPANT);
         const remaining = Math.max(0, target - totalPaid);

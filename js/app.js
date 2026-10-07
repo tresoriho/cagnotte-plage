@@ -50,6 +50,13 @@ class App {
         // Écouteurs pour les filtres et recherche
         this.setupParticipantFilters();
         this.setupDashboardSummaryFilters();
+
+        // Synchronisation automatique périodique (toutes les 3 secondes) et au focus de l'écran
+        setInterval(() => this.reloadData(), 3000);
+        window.addEventListener('focus', () => this.reloadData());
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') this.reloadData();
+        });
     }
 
     async reloadData() {
@@ -117,7 +124,14 @@ class App {
         const totalTarget = this.participants.reduce((sum, p) => sum + Number(p.objectif || CONFIG.TARGET_PER_PARTICIPANT), 0);
         
         const totalCollected = this.payments
-            .filter(p => p.statut === 'completed')
+            .filter(p => {
+                const st = (p.statut || '').toLowerCase().trim();
+                return st === 'confirmed' || st === 'completed';
+            })
+            .reduce((sum, p) => sum + Number(p.montant || 0), 0);
+
+        const totalPending = this.payments
+            .filter(p => (p.statut || '').toLowerCase().trim() === 'pending')
             .reduce((sum, p) => sum + Number(p.montant || 0), 0);
 
         const totalRemaining = Math.max(0, totalTarget - totalCollected);
@@ -219,7 +233,7 @@ class App {
         if (!container) return;
 
         const pending = this.payments.filter(p => p.statut === 'pending');
-        const completed = this.payments.filter(p => p.statut === 'completed');
+        const confirmed = this.payments.filter(p => p.statut === 'confirmed' || p.statut === 'completed');
 
         // Mettre à jour le badge de versements en attente
         if (pendingBadge) {
@@ -231,8 +245,8 @@ class App {
             }
         }
 
-        // Afficher d'abord tous les paiements en attente, puis les plus récents confirmés (max 5 au total)
-        const displayList = [...pending, ...completed].slice(0, 6);
+        // Afficher d'abord tous les paiements en attente, puis les plus récents confirmés (max 6 au total)
+        const displayList = [...pending, ...confirmed].slice(0, 6);
 
         if (displayList.length === 0) {
             container.innerHTML = `

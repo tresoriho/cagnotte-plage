@@ -23,10 +23,15 @@ CREATE TABLE IF NOT EXISTS public.paiements (
     wave_checkout_id VARCHAR(120),
     statut VARCHAR(30) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    paid_at TIMESTAMP WITH TIME ZONE
+    paid_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    validated_at TIMESTAMP WITH TIME ZONE,
+    cancelled_at TIMESTAMP WITH TIME ZONE,
+    validated_by VARCHAR(100),
+    cancel_reason VARCHAR(255)
 );
 
--- Si les tables existaient déjà en UUID, conversion automatique en TEXT
+-- Si les tables existaient déjà, ajout automatique des colonnes manquantes et conversion en TEXT
 DO $$
 BEGIN
     BEGIN
@@ -39,6 +44,20 @@ BEGIN
     END;
     BEGIN
         ALTER TABLE public.paiements ALTER COLUMN participant_id TYPE TEXT USING participant_id::TEXT;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    BEGIN
+        ALTER TABLE public.paiements ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
+        ALTER TABLE public.paiements ADD COLUMN IF NOT EXISTS validated_at TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE public.paiements ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE public.paiements ADD COLUMN IF NOT EXISTS validated_by VARCHAR(100);
+        ALTER TABLE public.paiements ADD COLUMN IF NOT EXISTS cancel_reason VARCHAR(255);
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    BEGIN
+        ALTER TABLE public.paiements DROP CONSTRAINT IF EXISTS paiements_statut_check;
+        ALTER TABLE public.paiements ADD CONSTRAINT paiements_statut_check CHECK (statut IN ('pending', 'confirmed', 'cancelled', 'completed'));
+        UPDATE public.paiements SET statut = 'confirmed' WHERE statut = 'completed';
     EXCEPTION WHEN OTHERS THEN NULL;
     END;
 END $$;
